@@ -49,3 +49,19 @@ def test_check_allows_write_inside_project(tmp_path):
     action = Action(tool="write_file", args={"path": str(tmp_path / "foo.py"), "content": "print(1)"}, raw="")
     decision = gov.check(action)
     assert decision.allow is True
+
+
+def test_check_denies_write_to_sibling_with_prefix_name(tmp_path):
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    sibling = tmp_path / "projevil"
+    sibling.mkdir()
+    gov = Governance(blocked_commands=[], auto_deny=False, project_dir=str(project_dir))
+    action = Action(
+        tool="write_file",
+        args={"path": str(sibling / "file.txt"), "content": "hacked"},
+        raw="",
+    )
+    decision = gov.check(action)
+    assert decision.allow is False
+    assert "outside" in decision.reason.lower()

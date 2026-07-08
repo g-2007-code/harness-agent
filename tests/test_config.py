@@ -46,3 +46,13 @@ def test_load_config_partial_yaml_uses_defaults(tmp_path):
     assert config.llm_provider == "anthropic"
     assert config.max_turns == 20  # default
     assert config.auto_deny is False  # default
+
+
+def test_load_config_defaults_not_shared_between_calls(tmp_path):
+    config1 = load_config(str(tmp_path / "nonexistent.yaml"))
+    config1.blocked_commands.append("evil-command")
+    config1.max_turns = 999
+
+    config2 = load_config(str(tmp_path / "also-nonexistent.yaml"))
+    assert "evil-command" not in config2.blocked_commands
+    assert config2.max_turns == 20

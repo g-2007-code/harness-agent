@@ -1,4 +1,5 @@
 # harness/config.py
+import copy
 import os
 import yaml
 from harness.models import Config
@@ -18,7 +19,7 @@ DEFAULTS = Config(
 
 def load_config(path: str) -> Config:
     if not os.path.exists(path):
-        return DEFAULTS
+        return copy.deepcopy(DEFAULTS)
 
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}

@@ -1,6 +1,7 @@
 # harness/loop.py
 import logging
-from harness.llm.base import LLMProvider
+import time
+from harness.llm.base import LLMProvider, LLMError
 from harness.tools import ToolRegistry
 from harness.governance import Governance
 from harness.feedback import collect
@@ -9,6 +10,8 @@ from harness.parser import parse, ParseError
 from harness.models import Action, ActionResult, Feedback
 
 logger = logging.getLogger("harness")
+
+LLM_MAX_RETRIES = 3
 
 
 class AgentLoop:
@@ -27,7 +30,22 @@ class AgentLoop:
         while turn < self._max_turns:
             turn += 1
             context = self._memory.build_context()
-            response = self._llm.complete(context)
+
+            response = None
+            for attempt in range(LLM_MAX_RETRIES + 1):
+                try:
+                    response = self._llm.complete(context)
+                    break
+                except LLMError as e:
+                    logger.warning(
+                        f"[turn {turn}] LLM error (attempt {attempt + 1}/"
+                        f"{LLM_MAX_RETRIES + 1}): {e}"
+                    )
+                    if attempt < LLM_MAX_RETRIES:
+                        time.sleep(2 ** attempt)
+                        continue
+                    return f"Stopped: LLM call failed after {LLM_MAX_RETRIES} retries"
+
             logger.info(f"[turn {turn}] LLM response: {response[:100]}")
 
             try:

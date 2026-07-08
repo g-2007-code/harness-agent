@@ -23,7 +23,11 @@ class Governance:
         if action.tool == "write_file":
             path = action.args.get("path", "")
             abs_path = os.path.abspath(path)
-            if not abs_path.startswith(self._project_dir):
+            try:
+                inside = os.path.commonpath([abs_path, self._project_dir]) == self._project_dir
+            except ValueError:
+                inside = False
+            if not inside:
                 return GovernanceDecision(allow=False, confirm=False, reason=f"Blocked: path outside project directory")
             return GovernanceDecision(allow=True, confirm=False, reason="safe")
 
