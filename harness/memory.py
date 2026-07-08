@@ -31,7 +31,7 @@ class Memory:
     def append(self, action: Action, feedback: Feedback):
         self._history.append((action, feedback))
         self._messages.append(Message(role="assistant", content=action.raw))
-        self._messages.append(Message(role="tool", content=feedback.summary))
+        self._messages.append(Message(role="user", content=f"[Tool Result] {feedback.summary}"))
 
     def save_session(self) -> Session:
         session_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{random.randint(1000, 9999)}"
