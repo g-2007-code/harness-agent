@@ -48,3 +48,25 @@ def test_write_file_creates_parent_dirs(tmp_path):
     result = write_file(path=str(file_path), content="print(1)")
     assert result.success is True
     assert file_path.read_text() == "print(1)"
+
+
+def test_run_shell_success():
+    from harness.tools.shell import run_shell
+    result = run_shell(command="echo hello")
+    assert result.success is True
+    assert "hello" in result.output
+    assert result.exit_code == 0
+
+
+def test_run_shell_failure():
+    from harness.tools.shell import run_shell
+    result = run_shell(command='python -c "import sys; sys.exit(1)"')
+    assert result.success is False
+    assert result.exit_code == 1
+
+
+def test_run_shell_timeout():
+    from harness.tools.shell import run_shell
+    result = run_shell(command='python -c "import time; time.sleep(10)"', timeout=1)
+    assert result.success is False
+    assert "timed out" in result.error.lower()
