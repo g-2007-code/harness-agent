@@ -54,6 +54,7 @@ class Session:
 class Config:
     llm_provider: str
     llm_model: str
+    llm_base_url: str
     max_turns: int
     blocked_commands: List[str]
     auto_deny: bool

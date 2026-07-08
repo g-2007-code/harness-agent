@@ -16,7 +16,7 @@ from harness.tools import ToolRegistry
 from harness.tools.file_tools import read_file, write_file
 from harness.tools.shell import run_shell
 
-PROVIDERS = ["openai", "anthropic", "google"]
+PROVIDERS = ["openai", "deepseek", "anthropic", "google"]
 KEYRING_SERVICE = "harness-agent"
 
 
@@ -83,7 +83,7 @@ def cmd_run(args):
         if not api_key:
             print(f"No API key found for {config.llm_provider}. Run: harness keyring setup")
             sys.exit(1)
-        llm = OpenAILLM(api_key=api_key, model=config.llm_model)
+        llm = OpenAILLM(api_key=api_key, model=config.llm_model, base_url=config.llm_base_url)
 
     registry = ToolRegistry()
     registry.register("read_file", read_file)

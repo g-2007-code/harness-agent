@@ -47,7 +47,7 @@ def test_session():
 
 def test_config_defaults():
     config = Config(
-        llm_provider="mock", llm_model="gpt-4o", max_turns=20,
+        llm_provider="mock", llm_model="gpt-4o", llm_base_url="", max_turns=20,
         blocked_commands=["rm -rf"], auto_deny=False,
         session_dir=".harness/sessions", log_level="info", log_dir=".harness/logs"
     )

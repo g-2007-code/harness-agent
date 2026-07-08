@@ -8,6 +8,7 @@ from harness.models import Config
 DEFAULTS = Config(
     llm_provider="mock",
     llm_model="gpt-4o",
+    llm_base_url="",
     max_turns=20,
     blocked_commands=["rm -rf", "git push --force", "curl", "wget", "chmod 777", "sudo"],
     auto_deny=False,
@@ -32,6 +33,7 @@ def load_config(path: str) -> Config:
     return Config(
         llm_provider=llm.get("provider", DEFAULTS.llm_provider),
         llm_model=llm.get("model", DEFAULTS.llm_model),
+        llm_base_url=llm.get("base_url", DEFAULTS.llm_base_url),
         max_turns=data.get("max_turns", DEFAULTS.max_turns),
         blocked_commands=gov.get("blocked_commands", DEFAULTS.blocked_commands),
         auto_deny=gov.get("auto_deny", DEFAULTS.auto_deny),
