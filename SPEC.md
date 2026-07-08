@@ -74,7 +74,7 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
   - `providers/google.py`：Gemini Generate Content API
   - `providers/mock.py`：确定性响应（单测用，按预设脚本返回）
 - **边界条件**：API 限流、网络错误、无效 key
-- **错误处理**：API 异常 → 抛出 LLMError，loop 捕获并决定重试或停机
+- **错误处理**：API 异常 → 抛出 LLMError，loop 捕获后重试（最多 3 次，指数退避），超限则停机并报错
 
 ### 3.4 工具模块 (`harness/tools/`)
 
@@ -86,8 +86,8 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
   - `write_file(path: str, content: str) -> ActionResult`：写入文件
   - `run_shell(command: str) -> ActionResult`：执行 shell 命令
 - **注册机制**：`ToolRegistry.register(name, func)` + `ToolRegistry.dispatch(action)`
-- **边界条件**：文件不存在、权限不足、命令超时
-- **错误处理**：捕获异常 → ActionResult(success=False, error=异常信息)
+- **边界条件**：文件不存在、权限不足、命令超时（默认 30 秒，可配置）
+- **错误处理**：捕获异常 → ActionResult(success=False, error=异常信息)；命令超时 → 终止子进程，返回 ActionResult(success=False, error="timeout")
 
 ### 3.5 治理模块 (`harness/governance.py`)
 
@@ -100,8 +100,8 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
   - `curl` / `wget`：外部网络请求
   - `chmod 777`：危险权限
   - `sudo`：提权操作
-- **边界条件**：非 shell 类动作（read_file/write_file）默认 Allow
-- **错误处理**：精确匹配黑名单 → Deny + 原因；命令包含黑名单模式作为子串 → Confirm + 原因；其余 → Allow
+- **边界条件**：非 shell 类动作（read_file/write_file）默认 Allow；write_file 限制在当前工作目录及子目录内（防止写系统文件）
+- **错误处理**：精确匹配黑名单 → Deny + 原因；命令包含黑名单模式作为子串 → Confirm + 原因；write_file 路径超出项目目录 → Deny + 原因；其余 → Allow
 - **CI 模式**：`governance.auto_deny=true` 时 Confirm 自动转为 Deny
 
 ### 3.6 反馈模块 (`harness/feedback.py`)
@@ -120,7 +120,7 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
 - **输出**：List[Message]（供 LLM 调用）
 - **会话内**：维护对话历史（系统提示 + 用户任务 + 每轮 Action/Feedback）
 - **跨会话**：将会话摘要写入 `.harness/sessions/<session_id>.json`；下次启动可加载
-- **Session 结构**：`Session(id, task, history: List[Feedback], summary: str)`
+- **Session 结构**：`Session(id, task, history: List[Tuple[Action, Feedback]], summary: str)`
 - **边界条件**：对话过长超出 token 限制
 - **错误处理**：超长时截断最早的非系统消息；MVP 设 max_turns 间接限制
 - **MVP 范围**：全量载入对话历史。"按需提供给 LLM 而非全量载入"为阶段 2 内容。
@@ -160,7 +160,7 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
 - **行为**：解析子命令，分发到对应处理函数
 - **子命令**：
   - `harness run "task"`：运行 agent
-  - `harness keyring setup`：引导录入 API key（隐藏输入）
+  - `harness keyring setup`：引导录入 API key（隐藏输入）；若已存在则覆盖更新
   - `harness keyring status`：显示已配置供应商（不回显明文）
   - `harness keyring clear`：清除 key
 - **输出**：执行结果或状态信息
@@ -462,7 +462,7 @@ CLI ──启动──→ Loop + Config + LLMProvider
 | 凭据 | key 存入 keyring 后 status 显示"已配置"；clear 后显示"未配置"；日志中无明文 key |
 | 分发 | `docker build` + `docker run` 成功；`pip install` 后 `harness` 命令可用 |
 | 测试 | `pytest tests/` 全部通过；CI 中 unit-test job pass |
-| 机制演示 | ① 治理拦截危险动作；② 注入失败反馈改变 LLM 下一步；③ 反馈闭环确定性行为 |
+| 机制演示 | ① 治理拦截危险动作；② 注入失败反馈改变 LLM 下一步；③ 反馈闭环确定性行为。形式：pytest 测试用例（`tests/test_demo.py`），在 mock LLM 下确定性运行，可通过 `pytest tests/test_demo.py -v` 一键复现 |
 
 ---
 
@@ -530,7 +530,7 @@ CLI ──启动──→ Loop + Config + LLMProvider
 ### 阶段 1：MVP（最小可运行 Harness）
 
 - 六维度最低实现：决策（主循环）/ 工具（read/write/shell）/ 治理（黑名单）/ 反馈（exit_code 判定）/ 记忆（会话+持久化）/ 配置（YAML）
-- LLM 抽象层：OpenAI + Mock
+- LLM 抽象层：OpenAI + Mock（MVP）；Anthropic / Google 为阶段 2 补充实现
 - CLI + keyring 凭据管理
 - Docker + PyPI 分发
 - mock-LLM 单元测试
