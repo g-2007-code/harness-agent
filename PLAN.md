@@ -764,7 +764,7 @@ git commit -m "feat: add LLM response parser (JSON extraction → Action)"
 **Depends on:** Task 2
 
 **Files:**
-- Create: `harness/tools/__init__.py`
+- Modify: `harness/tools/__init__.py`
 - Create: `harness/tools/file_tools.py`
 - Test: `tests/test_tools.py`
 
@@ -1713,7 +1713,12 @@ def cmd_run(args):
     logging.basicConfig(
         level=getattr(logging, config.log_level.upper(), logging.INFO),
         format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(os.path.join(config.log_dir, "harness.log")),
+        ],
     )
+    os.makedirs(config.log_dir, exist_ok=True)
 
     if config.llm_provider == "mock":
         llm = MockLLM([
@@ -2029,10 +2034,9 @@ FROM python:3.12-slim
 WORKDIR /app
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
-
 COPY harness/ ./harness/
 COPY config.yaml ./
+RUN pip install --no-cache-dir .
 
 ENTRYPOINT ["harness"]
 ```
