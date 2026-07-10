@@ -18,8 +18,8 @@ docker build -t harness-agent .
 
 ### Local (keyring — recommended)
 ```bash
-harness keyring setup
-harness keyring status
+harness keyring setup    # API key is hidden when typing (security), press Enter when done
+harness keyring status   # shows configured/not configured, never displays the key
 harness keyring clear --provider openai
 ```
 
