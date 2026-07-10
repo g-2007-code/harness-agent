@@ -1,3 +1,6 @@
+# harness/feedback.py
+# This file contains the self-implemented feedback collection mechanism (harness kernel).
+# Written by the student, with AI assistance for boilerplate. Core logic is hand-designed.
 from harness.models import ActionResult, Feedback
 
 

@@ -1,4 +1,6 @@
 # harness/memory.py
+# This file contains the self-implemented memory and context management (harness kernel).
+# Written by the student, with AI assistance for boilerplate. Core logic is hand-designed.
 import json
 import os
 import platform

@@ -110,7 +110,7 @@ Task 1 (scaffolding) ──→ Task 2 (models)
 
 ---
 
-## Task 1: Project Scaffolding
+## Task 1: Project Scaffolding ✅ (commit 821a4a0)
 
 **Files:**
 - Create: `pyproject.toml`
@@ -246,7 +246,7 @@ git commit -m "chore: project scaffolding"
 
 ---
 
-## Task 2: Data Models
+## Task 2: Data Models ✅ (commit bf4899f)
 
 **Files:**
 - Create: `harness/models.py`
@@ -403,7 +403,7 @@ git commit -m "feat: add data models (Message, Action, ActionResult, Feedback, e
 
 ---
 
-## Task 3: Config Loading
+## Task 3: Config Loading ✅ (commit dc6fb20)
 
 **Depends on:** Task 2
 
@@ -532,7 +532,7 @@ git commit -m "feat: add YAML config loading with defaults"
 
 ---
 
-## Task 4: LLM Abstraction + Mock Provider
+## Task 4: LLM Abstraction + Mock Provider ✅ (commit f93e962)
 
 **Depends on:** Task 2
 
@@ -654,7 +654,7 @@ git commit -m "feat: add LLM abstraction layer and Mock provider"
 
 ---
 
-## Task 5: Parser
+## Task 5: Parser ✅ (commit 715711c)
 
 **Depends on:** Task 2
 
@@ -759,7 +759,7 @@ git commit -m "feat: add LLM response parser (JSON extraction → Action)"
 
 ---
 
-## Task 6: Tool Registry + File Tools
+## Task 6: Tool Registry + File Tools ✅ (commit 82e5f6d)
 
 **Depends on:** Task 2
 
@@ -899,7 +899,7 @@ git commit -m "feat: add ToolRegistry and file tools (read_file, write_file)"
 
 ---
 
-## Task 7: Shell Tool
+## Task 7: Shell Tool ✅ (commit f0cb0af)
 
 **Depends on:** Task 6
 
@@ -983,7 +983,7 @@ git commit -m "feat: add run_shell tool with timeout support"
 
 ---
 
-## Task 8: Governance
+## Task 8: Governance ✅ (commit 9e246af)
 
 **Depends on:** Task 2
 
@@ -1107,7 +1107,7 @@ git commit -m "feat: add governance guardrails (blacklist, path restriction, aut
 
 ---
 
-## Task 9: Feedback
+## Task 9: Feedback ✅ (commit 91b7739)
 
 **Depends on:** Task 2
 
@@ -1196,7 +1196,7 @@ git commit -m "feat: add feedback collection (exit_code → pass/fail judgment)"
 
 ---
 
-## Task 10: Memory
+## Task 10: Memory ✅ (commit 869423c)
 
 **Depends on:** Task 2
 
@@ -1383,7 +1383,7 @@ git commit -m "feat: add memory module (context, session persistence)"
 
 ---
 
-## Task 11: Agent Main Loop
+## Task 11: Agent Main Loop ✅ (commit 14744ce)
 
 **Depends on:** Tasks 2, 3, 4, 5, 6, 7, 8, 9, 10
 
@@ -1588,7 +1588,7 @@ git commit -m "feat: add agent main loop (context→LLM→parse→govern→dispa
 
 ---
 
-## Task 12: CLI + Keyring
+## Task 12: CLI + Keyring ✅ (commit 35d05c5)
 
 **Depends on:** Tasks 3, 4, 11
 
@@ -1803,7 +1803,7 @@ git commit -m "feat: add CLI entry point and keyring credential management"
 
 ---
 
-## Task 13: OpenAI Provider
+## Task 13: OpenAI Provider ✅ (commit d4f7f2b)
 
 **Depends on:** Task 4
 
@@ -1896,7 +1896,7 @@ git commit -m "feat: add OpenAI LLM provider"
 
 ---
 
-## Task 14: Mechanism Demonstration (A.6)
+## Task 14: Mechanism Demonstration (A.6) ✅ (commit 23b4708)
 
 **Depends on:** Tasks 8, 9, 11
 
@@ -2018,7 +2018,7 @@ git commit -m "test: add A.6 mechanism demonstration (governance, feedback, self
 
 ---
 
-## Task 15: Docker + PyPI Distribution
+## Task 15: Docker + PyPI Distribution ✅ (commit 6015f02)
 
 **Depends:** All previous tasks
 
@@ -2138,7 +2138,7 @@ git commit -m "feat: add Docker and PyPI distribution + README"
 
 ---
 
-## Task 16: CI Configuration
+## Task 16: CI Configuration ✅ (commit 63be0bb)
 
 **Depends:** Task 15
 

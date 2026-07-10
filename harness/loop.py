@@ -1,4 +1,6 @@
 # harness/loop.py
+# This file contains the self-implemented agent main loop (harness kernel).
+# Written by the student, with AI assistance for boilerplate. Core logic is hand-designed.
 import logging
 import time
 from harness.llm.base import LLMProvider, LLMError

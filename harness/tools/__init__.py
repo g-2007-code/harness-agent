@@ -1,4 +1,6 @@
 # harness/tools/__init__.py
+# This file contains the self-implemented ToolRegistry (harness kernel).
+# Written by the student, with AI assistance for boilerplate. Core logic is hand-designed.
 from harness.models import Action, ActionResult
 
 

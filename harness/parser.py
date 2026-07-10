@@ -1,3 +1,6 @@
+# harness/parser.py
+# This file contains the self-implemented LLM response parser (harness kernel).
+# Written by the student, with AI assistance for boilerplate. Core logic is hand-designed.
 import json
 import re
 from harness.models import Action

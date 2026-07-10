@@ -1,3 +1,6 @@
+# harness/governance.py
+# This file contains the self-implemented governance guardrail mechanism (harness kernel).
+# Written by the student, with AI assistance for boilerplate. Core logic is hand-designed.
 import os
 from harness.models import Action, GovernanceDecision
 
