@@ -1,18 +1,25 @@
 # harness/memory.py
 import json
 import os
+import platform
 import time
 import random
 from harness.models import Message, Action, ActionResult, Feedback, Session
 
 
-SYSTEM_PROMPT = """You are a Python coding agent. You must respond with a JSON action.
+def _build_system_prompt() -> str:
+    return f"""You are a Python coding agent running on {platform.system()} ({platform.release()}).
+Current working directory: {os.getcwd()}
+Use platform-appropriate shell commands (e.g., Windows: cmd/PowerShell; Linux/macOS: bash).
+
+You must respond with exactly one JSON action. No explanations, no markdown — just the JSON.
 Available tools:
-- read_file: args={"path": str}
-- write_file: args={"path": str, "content": str}
-- run_shell: args={"command": str}
-To complete the task, respond with: {"tool": "task_complete", "args": {"summary": str}}
-Always respond with exactly one JSON action."""
+- read_file: args={{"path": str}}
+- write_file: args={{"path": str, "content": str}}
+- run_shell: args={{"command": str}}
+To complete the task, respond with: {{"tool": "task_complete", "args": {{"summary": str}}}}
+
+Important: JSON strings must be properly escaped. Use \\\\n for newlines, \\\\" for quotes inside strings."""
 
 
 class Memory:
@@ -20,7 +27,7 @@ class Memory:
         self._task = task
         self._session_dir = session_dir
         self._messages: list[Message] = [
-            Message(role="system", content=SYSTEM_PROMPT),
+            Message(role="system", content=_build_system_prompt()),
             Message(role="user", content=task),
         ]
         self._history: list[tuple[Action, Feedback]] = []
