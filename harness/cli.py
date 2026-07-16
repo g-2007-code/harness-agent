@@ -12,6 +12,7 @@ from harness.llm.mock import MockLLM
 from harness.loop import AgentLoop
 from harness.memory import Memory
 from harness.governance import Governance
+from harness.tui import TUI
 from harness.tools import ToolRegistry
 from harness.tools.file_tools import read_file, write_file
 from harness.tools.shell import run_shell
@@ -99,9 +100,9 @@ def cmd_run(args):
     loop = AgentLoop(
         llm=llm, registry=registry, governance=governance,
         memory=memory, max_turns=config.max_turns,
+        callback=TUI(),
     )
     result = loop.run(args.task)
-    print(result)
 
 
 def main():
