@@ -53,3 +53,43 @@ def test_config_defaults():
     )
     assert config.max_turns == 20
     assert config.auto_deny is False
+
+
+def test_check_result_creation():
+    from harness.models import CheckResult
+    check = CheckResult(name="syntax", passed=True, detail="Syntax OK")
+    assert check.name == "syntax"
+    assert check.passed is True
+    assert check.detail == "Syntax OK"
+
+
+def test_feedback_with_checks():
+    from harness.models import CheckResult
+    result = ActionResult(success=True, output="ok", error="", exit_code=0)
+    checks = [CheckResult(name="syntax", passed=True, detail="OK")]
+    fb = Feedback(passed=True, summary="[PASS]", raw_result=result,
+                  checks=checks, suggested_next_action="hint", turn_number=3)
+    assert fb.checks == checks
+    assert fb.suggested_next_action == "hint"
+    assert fb.turn_number == 3
+
+
+def test_feedback_defaults_backward_compat():
+    """Existing code creating Feedback without new fields must still work."""
+    result = ActionResult(success=True, output="ok", error="", exit_code=0)
+    fb = Feedback(passed=True, summary="[PASS]", raw_result=result)
+    assert fb.checks == []
+    assert fb.suggested_next_action == ""
+    assert fb.turn_number == 0
+
+
+def test_action_result_with_metadata():
+    result = ActionResult(success=True, output="ok", error="", exit_code=0,
+                          metadata={"path": "foo.py", "tool": "write_file"})
+    assert result.metadata["path"] == "foo.py"
+
+
+def test_action_result_metadata_default():
+    """Existing code creating ActionResult without metadata must still work."""
+    result = ActionResult(success=True, output="ok", error="", exit_code=0)
+    assert result.metadata == {}
