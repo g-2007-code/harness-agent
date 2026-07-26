@@ -70,3 +70,19 @@ def test_run_shell_timeout():
     result = run_shell(command='python -c "import time; time.sleep(10)"', timeout=1)
     assert result.success is False
     assert "timed out" in result.error.lower()
+
+
+def test_write_file_returns_metadata(tmp_path):
+    from harness.tools.file_tools import write_file
+    file_path = tmp_path / "output.txt"
+    result = write_file(path=str(file_path), content="print(1)")
+    assert result.success is True
+    assert result.metadata["path"] == str(file_path)
+    assert result.metadata["tool"] == "write_file"
+
+
+def test_run_shell_returns_metadata():
+    from harness.tools.shell import run_shell
+    result = run_shell(command="echo hello")
+    assert result.metadata["tool"] == "run_shell"
+    assert result.metadata["command"] == "echo hello"

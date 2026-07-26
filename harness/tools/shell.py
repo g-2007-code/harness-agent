@@ -1,4 +1,3 @@
-# harness/tools/shell.py
 import subprocess
 from harness.models import ActionResult
 
@@ -13,6 +12,7 @@ def run_shell(command: str, timeout: int = 30) -> ActionResult:
             output=proc.stdout,
             error=proc.stderr,
             exit_code=proc.returncode,
+            metadata={"tool": "run_shell", "command": command},
         )
     except subprocess.TimeoutExpired:
         return ActionResult(
