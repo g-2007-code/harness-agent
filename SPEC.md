@@ -69,12 +69,11 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
 - **输出**：响应文本（str）
 - **接口**：`LLMProvider.complete(messages: List[Message]) -> str`
 - **实现**：
-  - `providers/openai.py`：OpenAI Chat Completions API
-  - `providers/anthropic.py`：Anthropic Messages API
-  - `providers/google.py`：Gemini Generate Content API
-  - `providers/mock.py`：确定性响应（单测用，按预设脚本返回）
+  - `llm/openai.py`：OpenAI Chat Completions API（支持 OpenAI 及 DeepSeek 等兼容 API，通过 `base_url` 配置）
+  - `llm/mock.py`：确定性响应（单测用，按预设脚本返回）
 - **边界条件**：API 限流、网络错误、无效 key
 - **错误处理**：API 异常 → 抛出 LLMError，loop 捕获后重试（最多 3 次，指数退避），超限则停机并报错
+- **扩展方式**：新增 OpenAI 兼容供应商只需在 config.yaml 设置 `provider`、`model`、`base_url`
 
 ### 3.4 工具模块 (`harness/tools/`)
 
@@ -137,8 +136,9 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
 - **配置 schema**：
   ```yaml
   llm:
-    provider: openai        # openai / anthropic / google / mock
-    model: gpt-4o
+    provider: deepseek       # openai / deepseek / mock
+    model: deepseek-chat     # deepseek-chat / gpt-4o / etc.
+    base_url: "https://api.deepseek.com"  # omit for OpenAI, required for DeepSeek
   max_turns: 20
   governance:
     blocked_commands:
@@ -229,37 +229,36 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
 ┌──────────────────────────────────────────────────────────┐
 │                        CLI (cli.py)                       │
 │            harness run "task" / keyring subcommands       │
+│                         + TUI (tui.py)                    │
 └──────────────────────────┬───────────────────────────────┘
                            │
 ┌──────────────────────────▼───────────────────────────────┐
 │                  Agent 主循环 (loop.py)                     │
 │                                                           │
 │   while not done:                                         │
-│     1. context = memory.build_context(task, history)      │
-│     2. response = llm.complete(context)                   │
-│     3. actions = parser.parse(response)                   │
-│     4. for action in actions:                             │
-│          decision = governance.check(action)              │
-│          if not decision.allow and not decision.confirm:  │
-│            result = blocked_feedback                      │
-│          elif decision.confirm:                           │
-│            result = hitl_or_auto()                        │
-│          else: result = tools.dispatch(action)            │
-│          feedback = feedback.collect(result)              │
-│     5. memory.append(action, feedback)                    │
-│     6. done = stop_check(response, turn_count)            │
+│     1. context = memory.build_context()                  │
+│     2. response = llm.complete(context)                  │
+│     3. action = parser.parse(response)                   │
+│     4. decision = governance.check(action)               │
+│        if blocked: result = blocked_feedback              │
+│        elif confirm: result = hitl_or_auto()              │
+│        else: result = tools.dispatch(action)              │
+│     5. feedback = collect(result, tool, turn, history)    │
+│        → pipeline: basic → syntax check → pattern        │
+│     6. memory.append(action, feedback)                    │
+│     7. if feedback has failed checks or suggestion:      │
+│          memory.append_hint(detail)  ← drives LLM fix     │
+│     8. done = (action.tool == "task_complete")           │
 └──┬──────┬──────┬──────┬──────┬───────────────────────────┘
    │      │      │      │      │
    ▼      ▼      ▼      ▼      ▼
 ┌──────┐┌──────┐┌──────┐┌──────┐┌──────────┐
 │ LLM  ││ 工具  ││ 治理  ││ 反馈  ││ 记忆+配置 │
-│抽象层 ││ 分发  ││ 护栏  ││ 闭环  ││          │
+│抽象层 ││ 分发  ││ 护栏  ││ 流水线 ││ + hint   │
 └──┬───┘└──────┘└──────┘└──────┘└──────────┘
    │
-   ├─── providers/openai.py
-   ├─── providers/anthropic.py
-   ├─── providers/google.py
-   └─── providers/mock.py
+   ├─── llm/openai.py   (OpenAI + DeepSeek via base_url)
+   └─── llm/mock.py     (确定性测试用)
 ```
 
 ### 5.2 数据流
@@ -281,20 +280,26 @@ Parser.parse() ──→ Action
     ▼
 Governance.check(Action) ──→ GovernanceDecision
     │
-    ├─ Deny → Feedback(passed=False, "被拦截") → 回灌
-    ├─ Confirm → HITL input() / auto_deny → 回灌
+    ├─ Deny → ActionResult(success=False) → 进入反馈流水线
+    ├─ Confirm → HITL input() / auto_deny → 进入反馈流水线
     │
     ▼ Allow
-ToolRegistry.dispatch(Action) ──→ ActionResult
+ToolRegistry.dispatch(Action) ──→ ActionResult (含 metadata)
     │
     ▼
-Feedback.collect(ActionResult) ──→ Feedback
+Feedback.collect(result, tool, turn, history) ──→ Feedback
+    │  ┌─ Stage 1: 基础检查 (success/exit_code → PASS/FAIL)
+    │  ├─ Stage 2: 语法检查 (write_file .py → py_compile)
+    │  └─ Stage 3: 模式分析 (3 次连续失败 → suggestion)
     │
     ▼
 Memory.append(Action, Feedback) → 更新对话历史
     │
+    ├─ Feedback 有 failed checks → Memory.append_hint(错误详情)
+    ├─ Feedback 有 suggestion → Memory.append_hint(建议)
+    │
     ▼
-回到循环顶部
+回到循环顶部 (LLM 下轮看到 [Tool Result] + [Hint] → 自修正)
 ```
 
 ### 5.3 外部依赖
@@ -302,11 +307,11 @@ Memory.append(Action, Feedback) → 更新对话历史
 | 依赖 | 类型 | 用途 |
 |------|------|------|
 | OpenAI API | LLM 供应商 | GPT-4o 等模型调用 |
-| Anthropic API | LLM 供应商 | Claude 系列模型调用 |
-| Google API | LLM 供应商 | Gemini 系列模型调用 |
+| DeepSeek API | LLM 供应商 | DeepSeek 模型调用（via base_url） |
 | `keyring` | Python 库 | 跨平台凭据安全存储 |
 | `pytest` | Python 库 | 测试框架 |
 | `pyyaml` | Python 库 | YAML 配置解析 |
+| `rich` | Python 库 | TUI 终端界面渲染 |
 | Docker | 分发工具 | 容器镜像构建 |
 | PyPI | 分发平台 | pip 包发布 |
 
@@ -319,7 +324,7 @@ Memory.append(Action, Feedback) → 更新对话历史
 ```python
 @dataclass
 class Message:
-    role: str           # "system" / "user" / "assistant" / "tool"
+    role: str           # "system" / "user" / "assistant"
     content: str        # 消息内容
 
 @dataclass
@@ -338,12 +343,22 @@ class ActionResult:
     output: str         # stdout
     error: str          # stderr / 异常信息
     exit_code: int      # shell 退出码（非 shell 工具为 0/-1）
+    metadata: dict = field(default_factory=dict)  # 工具元数据（path, tool name 等）
+
+@dataclass
+class CheckResult:
+    name: str           # "syntax" / "pattern"
+    passed: bool
+    detail: str         # 检查详情
 
 @dataclass
 class Feedback:
     passed: bool        # 客观判定结果
     summary: str        # 结构化摘要（回灌给 LLM）
     raw_result: ActionResult
+    checks: List[CheckResult] = field(default_factory=list)  # 流水线检查结果
+    suggested_next_action: str = ""  # 模式分析建议
+    turn_number: int = 0  # 轮次号
 
 @dataclass
 class GovernanceDecision:
@@ -362,6 +377,7 @@ class Session:
 class Config:
     llm_provider: str
     llm_model: str
+    llm_base_url: str   # OpenAI 兼容 API 的 base_url（DeepSeek 等）
     max_turns: int
     blocked_commands: List[str]
     auto_deny: bool
@@ -375,15 +391,16 @@ class Config:
 ```
 Config ──配置──→ Loop
 Loop ──调用──→ LLMProvider (抽象)
-LLMProvider <──实现── OpenAI/Anthropic/Google/Mock
+LLMProvider <──实现── OpenAI(+DeepSeek)/Mock
 Loop ──调用──→ Parser
 Loop ──调用──→ Governance
 Loop ──调用──→ ToolRegistry
 ToolRegistry ──分发──→ read_file/write_file/run_shell
-Loop ──调用──→ Feedback
-Loop ──调用──→ Memory
+Loop ──调用──→ Feedback (多阶段流水线)
+Loop ──调用──→ Memory (含 append_hint / get_history)
 Memory ──持久化──→ Session (JSON 文件)
-CLI ──启动──→ Loop + Config + LLMProvider
+CLI ──启动──→ Loop + Config + LLMProvider + TUI
+TUI ──回调──→ Loop (on_start/on_turn/on_action/on_result/on_complete)
 ```
 
 ### 6.3 约束
@@ -492,28 +509,30 @@ CLI ──启动──→ Loop + Config + LLMProvider
 
 ### 11.2 反馈信号
 
-- **MVP**：捕获工具执行结果（stdout/stderr/exit_code），解析 exit_code 做客观判定（0=pass，非0=fail），生成结构化摘要回灌给循环。
-- **阶段 2 深化**：多阶段校验管道（lint → typecheck → test → coverage），每阶段解析结构化输出，分类失败原因（语法/类型/逻辑/风格），驱动多轮自我修正。
-- **编码实现**：`feedback.py` 中的 `collect(result: ActionResult) -> Feedback` 函数。注入假 ActionResult 即可确定性测试，无需真实 LLM。
+- **MVP（已实现）**：捕获工具执行结果（stdout/stderr/exit_code），解析 exit_code 做客观判定（0=pass，非0=fail），生成结构化摘要回灌给循环。
+- **阶段 2 深化（已实现）**：多阶段反馈流水线（基础检查 → 语法检查 py_compile → 模式分析），`CheckResult` 结构化检查结果，失败时注入 `[Hint]` 驱动 LLM 自修正。
+- **阶段 2 深化（未实现，YAGNI 裁剪）**：typecheck（mypy）、coverage、失败分类（语法/类型/逻辑/风格）。增加复杂度但价值有限，留作未来工作。
+- **编码实现**：`feedback.py` 中的 `collect(result, tool, turn_number, history) -> Feedback` 函数。注入假 ActionResult 即可确定性测试，无需真实 LLM。
 
 ### 11.3 危险动作
 
-- **MVP**：黑名单拦截（`rm -rf` / `git push --force` / `curl` / `wget` / `chmod 777` / `sudo`）。`governance.check(action) -> GovernanceDecision` 函数。
-- **阶段 2 深化**：HITL 状态机（待确认→已确认/已拒绝）、风险分级（safe/needs-confirm/blocked）、范围围栏（限制文件操作路径）。
+- **MVP（已实现）**：黑名单拦截（`rm -rf` / `git push --force` / `curl` / `wget` / `chmod 777` / `sudo`）+ 路径围栏（write_file 限制在项目目录内）+ auto_deny（CI 模式）。`governance.check(action) -> GovernanceDecision` 函数。
+- **阶段 2 深化（未实现，YAGNI 裁剪）**：HITL 状态机（待确认→已确认/已拒绝）、风险分级（safe/needs-confirm/blocked）。MVP 的 Allow/Confirm/Deny 三态已满足需求。
 - **编码实现**：`governance.py` 中的 `check(action: Action) -> GovernanceDecision` 函数。构造 `Action(command="rm -rf /")` 直接测试，每次都返回 Deny。
 
 ### 11.4 所需工具
 
 - `read_file(path)`：读取文件内容
-- `write_file(path, content)`：写入文件
+- `write_file(path, content)`：写入文件（返回含 `metadata` 供流水线使用）
 - `run_shell(command)`：执行 shell 命令（含运行 pytest/lint/typecheck）
-- **阶段 2**：`run_tests()`、`run_lint()`、`run_typecheck()` 专用工具（结构化输出解析）
+- **阶段 2（未实现，YAGNI 裁剪）**：`run_tests()`、`run_lint()`、`run_typecheck()` 专用工具。当前通过 `run_shell` 调用即可，无需单独封装。
 
 ### 11.5 记忆需求
 
-- **MVP**：会话内对话历史（系统提示 + 用户任务 + 每轮 Action/Feedback）；跨会话 Session 持久化（.harness/sessions/）。
-- **阶段 2 深化**：项目约定学习（从 pyproject.toml 提取测试命令、lint 配置等）；按需检索而非全量载入。
-- **编码实现**：`memory.py` 中的 `build_context()` / `append()` / `save_session()` / `load_session()` 函数。直接测试，无需真实 LLM。
+- **MVP（已实现）**：会话内对话历史（系统提示 + 用户任务 + 每轮 Action/Feedback）；跨会话 Session 持久化（.harness/sessions/）。
+- **阶段 2 深化（已实现）**：`Memory.append_hint()` 注入 LLM 可见提示；`Memory.get_history()` 返回近期历史供模式分析。
+- **阶段 2 深化（未实现，YAGNI 裁剪）**：项目约定学习（从 pyproject.toml 提取测试命令等）；按需检索而非全量载入。留作未来工作。
+- **编码实现**：`memory.py` 中的 `build_context()` / `append()` / `append_hint()` / `get_history()` / `save_session()` / `load_session()` 函数。直接测试，无需真实 LLM。
 
 ### 11.6 重点维度：反馈闭环
 
@@ -532,19 +551,30 @@ CLI ──启动──→ Loop + Config + LLMProvider
 
 ## 十二、两阶段交付计划
 
-### 阶段 1：MVP（最小可运行 Harness）
+### 阶段 1：MVP（最小可运行 Harness）— 已完成 ✅
 
 - 六维度最低实现：决策（主循环）/ 工具（read/write/shell）/ 治理（黑名单）/ 反馈（exit_code 判定）/ 记忆（会话+持久化）/ 配置（YAML）
-- LLM 抽象层：OpenAI + Mock（MVP）；Anthropic / Google 为阶段 2 补充实现
+- LLM 抽象层：OpenAI + Mock；DeepSeek 通过 base_url 兼容接入
 - CLI + keyring 凭据管理
 - Docker + PyPI 分发
-- mock-LLM 单元测试
+- mock-LLM 单元测试（61 个）
 - 机制演示（3 项）
+- TUI 终端界面（rich 库回调渲染）
 
-### 阶段 2：反馈闭环深化
+### 阶段 2：反馈闭环深化 — 已完成 ✅
 
-- 多阶段校验管道（lint→typecheck→test→coverage）
-- 失败分类（语法/类型/逻辑/风格）
-- 多轮自我修正循环
-- 治理深化（HITL 状态机、风险分级、范围围栏）
-- 记忆深化（项目约定学习、按需检索）
+**已实现**：
+- 多阶段反馈流水线（基础检查 → 语法检查 py_compile → 模式分析）
+- `CheckResult` 结构化检查结果
+- `Feedback.checks[]` / `suggested_next_action` / `turn_number`
+- `ActionResult.metadata` 工具元数据
+- `Memory.append_hint()` / `Memory.get_history()`
+- Loop 注入 `[Hint]` 驱动 LLM 自修正
+- 机制演示第 4 项（流水线语法检查 → hint → 自修正）
+- 27 个新测试（共 88 个）
+
+**未实现（YAGNI 裁剪）**：
+- typecheck（mypy）、coverage — 增加复杂度但价值有限
+- HITL 状态机、风险分级、范围围栏 — MVP 治理已满足需求
+- 项目约定学习、按需检索 — 记忆深化留作未来工作
+- Anthropic / Google provider — 可通过 base_url 扩展，无需单独实现
