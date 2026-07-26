@@ -45,3 +45,45 @@ def test_load_nonexistent_session(tmp_path):
     mem = Memory(task="test", session_dir=str(tmp_path))
     result = mem.load_session("nonexistent-id")
     assert result is None
+
+
+def test_append_hint():
+    from harness.memory import Memory
+    mem = Memory(task="test", session_dir=".")
+    mem.append_hint("Check syntax before retrying")
+    ctx = mem.build_context()
+    assert any("[Hint]" in m.content for m in ctx)
+    assert any("Check syntax" in m.content for m in ctx)
+
+
+def test_get_history_empty():
+    from harness.memory import Memory
+    mem = Memory(task="test", session_dir=".")
+    assert mem.get_history() == []
+
+
+def test_get_history_returns_recent():
+    from harness.memory import Memory
+    from harness.models import Action, ActionResult, Feedback
+    mem = Memory(task="test", session_dir=".")
+    for i in range(5):
+        action = Action(tool="read_file", args={}, raw="")
+        result = ActionResult(success=True, output="ok", error="", exit_code=0)
+        fb = Feedback(passed=True, summary="[PASS]", raw_result=result)
+        mem.append(action, fb)
+    history = mem.get_history()
+    assert len(history) == 5
+    assert all(isinstance(h, tuple) for h in history)
+
+
+def test_get_history_caps_at_10():
+    from harness.memory import Memory
+    from harness.models import Action, ActionResult, Feedback
+    mem = Memory(task="test", session_dir=".")
+    for i in range(15):
+        action = Action(tool="read_file", args={}, raw="")
+        result = ActionResult(success=True, output="ok", error="", exit_code=0)
+        fb = Feedback(passed=True, summary="[PASS]", raw_result=result)
+        mem.append(action, fb)
+    history = mem.get_history()
+    assert len(history) == 10

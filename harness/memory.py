@@ -42,6 +42,14 @@ class Memory:
         self._messages.append(Message(role="assistant", content=action.raw))
         self._messages.append(Message(role="user", content=f"[Tool Result] {feedback.summary}"))
 
+    def append_hint(self, hint: str):
+        """Inject a hint message visible to the LLM."""
+        self._messages.append(Message(role="user", content=f"[Hint] {hint}"))
+
+    def get_history(self) -> list:
+        """Return recent (Action, Feedback) pairs for pattern analysis."""
+        return self._history[-10:]
+
     def save_session(self) -> Session:
         session_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{random.randint(1000, 9999)}"
         session = Session(id=session_id, task=self._task, history=self._history, summary="")
