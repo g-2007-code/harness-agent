@@ -24,20 +24,24 @@
 
 ```
 harness-agent/
+├── .github/workflows/
+│   └── test.yml           # GitHub Actions (unit-test + docker-build)
 ├── harness/
 │   ├── __init__.py
-│   ├── models.py          # Data models (Message, Action, ActionResult, Feedback, etc.)
+│   ├── models.py          # Data models (Message, Action, ActionResult, Feedback, CheckResult, etc.)
 │   ├── config.py          # YAML config loading with defaults
 │   ├── parser.py          # Parse LLM JSON response → Action
 │   ├── governance.py      # Guardrail: check(action) → GovernanceDecision
-│   ├── feedback.py        # Collect ActionResult → Feedback (pass/fail judgment)
-│   ├── memory.py          # Session context + cross-session persistence
-│   ├── loop.py            # Agent main loop
-│   ├── cli.py             # CLI entry + keyring subcommands
+│   ├── feedback.py        # Multi-stage pipeline: basic → syntax check → pattern analysis
+│   ├── memory.py          # Session context + cross-session persistence + hint injection
+│   ├── loop.py            # Agent main loop (6-step cycle + hint injection)
+│   ├── cli.py             # CLI entry + keyring subcommands + TUI integration
+│   ├── tui.py             # Terminal UI renderer (rich-based callback)
 │   ├── llm/
 │   │   ├── __init__.py    # LLMProvider ABC + factory
+│   │   ├── base.py        # LLMProvider ABC + LLMError
 │   │   ├── mock.py        # Mock LLM (deterministic, script-based)
-│   │   └── openai.py      # OpenAI Chat Completions provider
+│   │   └── openai.py      # OpenAI Chat Completions provider (OpenAI + DeepSeek via base_url)
 │   └── tools/
 │       ├── __init__.py    # ToolRegistry
 │       ├── file_tools.py  # read_file, write_file
@@ -53,6 +57,7 @@ harness-agent/
 │   ├── test_memory.py
 │   ├── test_tools.py
 │   ├── test_llm_mock.py
+│   ├── test_llm_openai.py
 │   ├── test_loop.py
 │   ├── test_cli.py
 │   └── test_demo.py       # Mechanism demonstration (A.6)
@@ -64,7 +69,10 @@ harness-agent/
 ├── SPEC.md
 ├── PLAN.md
 ├── AGENT_LOG.md
-└── .gitlab-ci.yml
+├── .gitlab-ci.yml
+└── docs/superpowers/
+    ├── specs/             # Phase 2 design spec
+    └── plans/             # Phase 2 implementation plan
 ```
 
 ## Task Dependency Graph

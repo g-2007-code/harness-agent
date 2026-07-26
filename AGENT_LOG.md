@@ -12,7 +12,7 @@
 - **操作**：读取三个作业文档，分析 A/B 两个方向，推荐 A（Coding Agent Harness）
 - **关键决策**：
   - 语言：Python
-  - LLM：可插拔（OpenAI/Anthropic/Google/Mock）
+  - LLM：可插拔（OpenAI + DeepSeek via base_url + Mock）
   - 重点维度：反馈闭环
   - 目标场景：Python 项目专用 coding agent
   - 交互方式：CLI
@@ -298,7 +298,7 @@
 
 ---
 
-## 教训总结（更新）
+## 教训总结
 
 1. **PLAN 中的代码在 Windows 上可能需要调整**：引号语法、命令兼容性、断言文本匹配
 2. **系统提示词必须包含运行环境信息**：否则 LLM 默认用 Linux 命令

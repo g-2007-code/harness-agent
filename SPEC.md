@@ -6,7 +6,7 @@
 
 ### 要解决什么问题
 
-当 LLM 能完成大部分编码工作时，一个工程师的真正价值落在 **harness** 这层工程——把一个只会产生设想的 LLM，封装成一台能稳定、可靠工作的系统。本项目构建一个面向 Python 项目的 CLI coding agent harness，回答：治理、反馈、上下文、安全、分发这些工程环节，到底需要什么？
+当 LLM 能完成大部分编码工作时，一个工程师的真正价值落在 **harness** 这层工程——把一个只会产生设想的 LLM，封装成一台能稳定、可靠工作的系统。本项目构建一个面向 Python 项目的 CLI coding agent harness，回答：决策、工具、治理、反馈、记忆、配置这些工程环节，到底需要什么？
 
 ### 目标用户
 
@@ -416,7 +416,7 @@ TUI ──回调──→ Loop (on_start/on_turn/on_action/on_result/on_complete
 
 ### 7.1 Key 存储方案
 
-- **存储**：`keyring` 库，服务名 `harness-agent`，按供应商名存储（`openai` / `anthropic` / `google`）
+- **存储**：`keyring` 库，服务名 `harness-agent`，按供应商名存储（`openai` / `deepseek`）
 - **录入流程**：
   1. 用户执行 `harness keyring setup`
   2. CLI 提示选择供应商
@@ -426,7 +426,7 @@ TUI ──回调──→ Loop (on_start/on_turn/on_action/on_result/on_complete
 - **查看流程**：
   1. 用户执行 `harness keyring status`
   2. 遍历已知供应商，检查 `keyring.get_password()` 是否非空
-  3. 输出：`openai: 已配置` / `anthropic: 未配置`（不回显明文）
+  3. 输出：`openai: 已配置` / `deepseek: 未配置`（不回显明文）
 - **清除流程**：
   1. 用户执行 `harness keyring clear [--provider openai]`
   2. 调用 `keyring.delete_password()`
