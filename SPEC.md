@@ -106,12 +106,16 @@ Python 开发者，希望用 AI 辅助完成编码任务（修 bug、加功能�
 
 ### 3.6 反馈模块 (`harness/feedback.py`)
 
-- **输入**：ActionResult
-- **行为**：解析执行结果，做客观判定（exit_code == 0 → pass，否则 fail），生成结构化摘要
-- **输出**：Feedback(passed: bool, summary: str, raw_result: ActionResult)
-- **边界条件**：非 shell 工具（read_file/write_file）的 success 字段直接作为 passed
-- **错误处理**：ActionResult.success=False → Feedback(passed=False, summary=错误信息)
-- **MVP 范围**：被动捕获工具执行结果并回灌。主动校验管道（lint→typecheck→test）为阶段 2 深化内容。
+- **输入**：ActionResult、工具名、轮次号、历史记录
+- **行为**：执行多阶段反馈流水线——基础检查 → 语法检查（写 .py 文件后自动 py_compile）→ 模式分析（检测连续失败模式）
+- **输出**：Feedback(passed, summary, raw_result, checks[], suggested_next_action, turn_number)
+- **流水线阶段**：
+  1. 基础检查：`result.success` → PASS/FAIL
+  2. 语法检查：`write_file` 写 `.py` 文件后自动运行 `py_compile`，失败则 `passed=False`
+  3. 模式分析：检测最近 5 轮中是否有 3 次以上连续失败，生成建议
+- **边界条件**：非 `.py` 文件跳过语法检查；历史不足 3 轮不生成建议
+- **错误处理**：语法检查失败 → `CheckResult(passed=False, detail=错误信息)` → 注入 hint 到 LLM 上下文
+- **自修正机制**：harness 检测失败 → 注入结构化 hint → LLM 下轮看到 hint → 自修正。harness 不直接修复文件（那需要 LLM 智能）。
 
 ### 3.7 记忆模块 (`harness/memory.py`)
 
@@ -521,7 +525,8 @@ CLI ──启动──→ Loop + Config + LLMProvider
 
 **编码实现方式**：
 - MVP：`Feedback.collect(ActionResult) -> Feedback`，解析 exit_code 做客观判定。
-- 阶段 2：`ValidationPipeline` 类，编排 lint→typecheck→test 三阶段，每阶段有独立校验器，解析结构化输出，分类失败原因，生成综合 Feedback 回灌给循环。整个管道用 mock 测试结果即可确定性验证。
+- 阶段 2（已实现）：多阶段反馈流水线（基础检查 → 语法检查 py_compile → 模式分析），`CheckResult` 结构化检查结果，`Feedback.checks[]` 存储所有检查结果，`suggested_next_action` 存储模式分析建议。Loop 在检测到失败时注入 `[Hint]` 消息到 LLM 上下文，驱动 LLM 自修正。
+- 阶段 2（未实现，YAGNI 裁剪）：typecheck（mypy）、coverage、HITL 状态机、项目约定学习。这些增加复杂度但价值有限，留作未来工作。
 
 ---
 

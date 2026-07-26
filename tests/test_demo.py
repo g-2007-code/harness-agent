@@ -1,11 +1,13 @@
 # tests/test_demo.py
 """
-A.6 Mechanism Demonstration: 3 deterministic behaviors under mock LLM.
+A.6 Mechanism Demonstration: 4 deterministic behaviors under mock LLM.
 
 ① Governance guardrail blocks a dangerous action
 ② Injected failure feedback causes agent to change next action
 ③ Feedback loop deterministic behavior (pass/fail judgment)
+④ Feedback pipeline: syntax check → hint injection → LLM self-correction
 """
+import json
 from harness.loop import AgentLoop
 from harness.llm.mock import MockLLM
 from harness.tools import ToolRegistry
@@ -81,3 +83,38 @@ def test_demo_3_feedback_deterministic_judgment():
     assert "[FAIL]" in fail_fb.summary
     assert "1" in fail_fb.summary  # exit_code
     assert "SyntaxError" in fail_fb.summary
+
+
+def test_demo_4_feedback_pipeline_syntax_check(tmp_path):
+    """④ 反馈流水线：写文件后自动语法检查，失败时注入 hint 驱动 LLM 自修正"""
+    bad_file = tmp_path / "bad.py"
+    responses = [
+        f'{{"tool": "write_file", "args": {{"path": {json.dumps(str(bad_file))}, "content": "def broken(\\n"}}}}',
+        f'{{"tool": "write_file", "args": {{"path": {json.dumps(str(bad_file))}, "content": "def fixed():\\n    pass\\n"}}}}',
+        '{"tool": "task_complete", "args": {"summary": "fixed syntax error"}}',
+    ]
+    llm = MockLLM(responses)
+    registry = ToolRegistry()
+    registry.register("write_file", write_file)
+    registry.register("read_file", read_file)
+    registry.register("run_shell", run_shell)
+
+    loop = AgentLoop(
+        llm=llm,
+        registry=registry,
+        governance=Governance(blocked_commands=[], auto_deny=True, project_dir=str(tmp_path)),
+        memory=Memory(task="fix syntax", session_dir=str(tmp_path / "sessions")),
+        max_turns=10,
+    )
+    result = loop.run("fix syntax")
+    assert "fixed" in result.lower()
+
+    # Verify the pipeline ran a syntax check on the first write
+    ctx = loop._memory.build_context()
+    # First write should have failed syntax check
+    assert any("Syntax" in m.content or "syntax" in m.content.lower() for m in ctx)
+    # A hint should have been injected
+    assert any("[Hint]" in m.content for m in ctx)
+    # The file should eventually be valid
+    import py_compile
+    py_compile.compile(str(bad_file), doraise=True)
