@@ -5,10 +5,11 @@ A self-implemented coding agent harness for Python projects. Built from scratch 
 ## Features
 
 - **Self-implemented agent main loop**: context assembly → LLM call → response parsing → governance check → tool dispatch → feedback collection → memory append → stop check
+- **Multi-stage feedback pipeline** (Phase 2): basic check → syntax check (py_compile) → pattern analysis (consecutive failure detection) → hint injection drives LLM self-correction
 - **Pluggable LLM abstraction**: OpenAI, DeepSeek, Mock (for testing)
 - **Code-level governance guardrails**: blacklist blocking, path restriction, HITL confirmation
-- **Deterministic feedback**: exit_code → pass/fail judgment, structured summary fed back to LLM
-- **Cross-session memory**: conversation history + JSON persistence
+- **Terminal UI (TUI)**: rich-based real-time display of Task/Turn/Action/Result/Complete panels
+- **Cross-session memory**: conversation history + JSON persistence + hint injection
 - **Credential security**: OS keyring storage, never hardcoded/committed/logged
 - **Docker + PyPI distribution**: one command install/run
 
@@ -151,7 +152,7 @@ harness keyring clear [--provider openai]
 ## Testing
 
 ```bash
-# Run all tests (61 tests, no network needed)
+# Run all tests (88 tests, no network needed)
 pytest tests/ -v
 
 # Run mechanism demonstrations (A.6)
@@ -171,10 +172,11 @@ harness-agent/
 │   ├── config.py          # YAML config loading with defaults
 │   ├── parser.py          # Parse LLM JSON response → Action
 │   ├── governance.py      # Guardrails: blacklist, path restriction, auto_deny
-│   ├── feedback.py        # Collect ActionResult → Feedback (pass/fail judgment)
-│   ├── memory.py          # Session context + cross-session JSON persistence
-│   ├── loop.py            # Agent main loop (6-step cycle)
-│   ├── cli.py             # CLI entry + keyring subcommands
+│   ├── feedback.py        # Multi-stage pipeline: basic → syntax check → pattern analysis
+│   ├── memory.py          # Session context + cross-session JSON persistence + hint injection
+│   ├── loop.py            # Agent main loop (6-step cycle + hint injection)
+│   ├── cli.py             # CLI entry + keyring subcommands + TUI integration
+│   ├── tui.py             # Terminal UI renderer (rich-based callback)
 │   ├── llm/
 │   │   ├── __init__.py    # Exports LLMProvider, LLMError
 │   │   ├── base.py        # LLMProvider ABC + LLMError
@@ -186,18 +188,18 @@ harness-agent/
 │       └── shell.py       # run_shell (with timeout)
 ├── tests/
 │   ├── conftest.py        # Shared fixtures
-│   ├── test_models.py     # 7 tests
+│   ├── test_models.py     # 12 tests
 │   ├── test_config.py     # 4 tests
 │   ├── test_parser.py     # 5 tests
 │   ├── test_governance.py # 7 tests
-│   ├── test_feedback.py   # 5 tests
-│   ├── test_memory.py     # 4 tests
-│   ├── test_tools.py      # 9 tests
+│   ├── test_feedback.py   # 18 tests (pipeline stages)
+│   ├── test_memory.py     # 8 tests
+│   ├── test_tools.py      # 11 tests
 │   ├── test_llm_mock.py   # 4 tests
 │   ├── test_llm_openai.py # 3 tests
-│   ├── test_loop.py       # 6 tests
+│   ├── test_loop.py       # 8 tests (incl. hint injection)
 │   ├── test_cli.py        # 4 tests
-│   └── test_demo.py       # 3 mechanism demonstrations (A.6)
+│   └── test_demo.py       # 4 mechanism demonstrations (A.6)
 ├── config.yaml            # Default config (DeepSeek)
 ├── Dockerfile             # Docker image
 ├── pyproject.toml         # Package config
@@ -232,7 +234,7 @@ To add a new OpenAI-compatible provider, just set `provider`, `model`, and `base
 ## Known Limitations
 
 - Python 3.10+ required
-- MVP feedback is reactive (captures tool results), not proactive (auto lint/test pipeline)
+- Feedback pipeline covers syntax check (py_compile) and pattern analysis; typecheck (mypy) and coverage are future work
 - No sandboxing for shell commands (governance blacklist only)
 - Cross-session memory is file-based (JSON), not vector-indexed
 - System prompt includes platform info (Windows/Linux) to avoid cross-platform command issues
@@ -240,7 +242,7 @@ To add a new OpenAI-compatible provider, just set `provider`, `model`, and `base
 
 ## Mechanism Demonstration (A.6)
 
-Three deterministic demonstrations under mock LLM:
+Four deterministic demonstrations under mock LLM:
 
 ```bash
 pytest tests/test_demo.py -v
@@ -249,6 +251,7 @@ pytest tests/test_demo.py -v
 1. **Governance guardrail blocks dangerous action**: agent tries `rm -rf /` → blocked → agent changes approach
 2. **Failure feedback changes next action**: agent reads nonexistent file → failure feedback → agent reports "file not found"
 3. **Deterministic pass/fail judgment**: `exit_code=0` → `[PASS]`, `exit_code=1` → `[FAIL]` with error details
+4. **Feedback pipeline syntax check**: agent writes file with syntax error → py_compile detects it → hint injected → agent rewrites with correct syntax → verified
 
 ## License
 

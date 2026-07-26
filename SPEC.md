@@ -466,7 +466,7 @@ CLI ──启动──→ Loop + Config + LLMProvider
 | 凭据 | key 存入 keyring 后 status 显示"已配置"；clear 后显示"未配置"；日志中无明文 key |
 | 分发 | `docker build` + `docker run` 成功；`pip install` 后 `harness` 命令可用 |
 | 测试 | `pytest tests/` 全部通过；CI 中 unit-test job pass |
-| 机制演示 | ① 治理拦截危险动作；② 注入失败反馈改变 LLM 下一步；③ 反馈闭环确定性行为。形式：pytest 测试用例（`tests/test_demo.py`），在 mock LLM 下确定性运行，可通过 `pytest tests/test_demo.py -v` 一键复现 |
+| 机制演示 | ① 治理拦截危险动作；② 注入失败反馈改变 LLM 下一步；③ 反馈闭环确定性行为；④ 反馈流水线语法检查（写文件后自动 py_compile，失败注入 hint 驱动 LLM 自修正）。形式：pytest 测试用例（`tests/test_demo.py`），在 mock LLM 下确定性运行，可通过 `pytest tests/test_demo.py -v` 一键复现 |
 
 ---
 

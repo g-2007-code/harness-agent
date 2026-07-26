@@ -144,3 +144,33 @@ Subagent 提出一个 minor note（非错误）：parser 的贪婪正则 `\{.*\}
 **brainstorming 技能让我不满的地方**：
 - 初始设计未主动对照作业要求，依赖用户多次要求才进行合规检查
 - 架构设计阶段过于关注"模块划分"而忽略了"模块间通信的数据模型"，导致后续需要补充
+
+---
+
+## 五、Phase 2 Brainstorming 过程
+
+### 背景
+
+Phase 1（MVP）完成后，用户要求"继续根据 superpowers 的流程完成后续补充"。我重新审阅了所有 md 文档和作业要求，确定了 Phase 2 方向为反馈闭环深化。
+
+### 方案选择
+
+提出 3 个方案：
+- A: 后置钩子（~50 行，改动最小）
+- B: 反馈流水线（~150 行，通用可扩展）
+- C: 完整闭环（~300 行，流水线 + 自修正 + 模式检测）
+
+用户选 C（完整闭环）。
+
+### 设计审阅与修复
+
+设计文档初版有 4 个问题，在用户要求"重新检查实现思路"后发现并修复：
+
+1. **"自修正"概念混淆**：设计文档写了 `_try_auto_fix()` 函数，但 harness 无法自己修复语法错误——这需要 LLM 智能。修复为"增强反馈注入驱动 LLM 自修正"。
+2. **模式分析读错字段**：`fb.raw_result.metadata.get("tool")` 应为 `action.tool`（从 history 元组取）。
+3. **与 SPEC 不对齐**：SPEC §11.6 承诺了 typecheck/coverage/HITL 状态机等，但设计只覆盖了 syntax check + pattern analysis。明确标注 scope cut。
+4. **未提及更新 SPEC**：实现 Phase 2 后应同步更新 SPEC §3.6 和 §11.6。
+
+### 反思
+
+Phase 2 的 brainstorming 暴露了一个问题：设计文档的"自修正"概念在初版中是错误的。原因是我在写设计时没有严格区分"harness 能做什么"和"LLM 能做什么"——harness 只能检测和注入 hint，修复是 LLM 的职责。这个概念混淆如果没被发现，会导致 writing-plans 产出一个无法实现的 task（`_try_auto_fix` 函数体为空）。
