@@ -11,6 +11,23 @@ def _check_syntax(path: str) -> CheckResult:
         return CheckResult(name="syntax", passed=False, detail=str(e))
 
 
+def _analyze_patterns(history: list) -> str:
+    """Detect recurring failure patterns in recent history.
+
+    history is a list of (Action, Feedback) tuples.
+    Returns a suggestion string, or empty string if no pattern detected.
+    """
+    recent = history[-5:]
+    failures = [(action, fb) for action, fb in recent if not fb.passed]
+    if len(failures) >= 3:
+        tools = [action.tool for action, _ in failures]
+        if all(t == "write_file" for t in tools):
+            return "Hint: 3 consecutive write failures. Check syntax and file permissions before retrying."
+        if all(t == "run_shell" for t in tools):
+            return "Hint: 3 consecutive shell failures. Try a different command or approach."
+    return ""
+
+
 def collect(result: ActionResult, tool: str = "") -> Feedback:
     if result.success:
         summary = f"[PASS] {tool}: {result.output[:200]}"

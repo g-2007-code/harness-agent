@@ -55,3 +55,51 @@ def test_check_syntax_fail(tmp_path):
     assert check.name == "syntax"
     assert check.passed is False
     assert "SyntaxError" in check.detail or "syntax" in check.detail.lower()
+
+
+def test_pattern_analysis_3_write_failures():
+    from harness.feedback import _analyze_patterns
+    from harness.models import Action, ActionResult
+    history = []
+    for i in range(3):
+        action = Action(tool="write_file", args={"path": f"f{i}.py"}, raw="")
+        result = ActionResult(success=False, output="", error="error", exit_code=1)
+        fb = Feedback(passed=False, summary="[FAIL]", raw_result=result)
+        history.append((action, fb))
+    suggestion = _analyze_patterns(history)
+    assert "write" in suggestion.lower()
+    assert "3" in suggestion
+
+
+def test_pattern_analysis_3_shell_failures():
+    from harness.feedback import _analyze_patterns
+    from harness.models import Action, ActionResult
+    history = []
+    for i in range(3):
+        action = Action(tool="run_shell", args={"command": "bad"}, raw="")
+        result = ActionResult(success=False, output="", error="error", exit_code=1)
+        fb = Feedback(passed=False, summary="[FAIL]", raw_result=result)
+        history.append((action, fb))
+    suggestion = _analyze_patterns(history)
+    assert "shell" in suggestion.lower()
+
+
+def test_pattern_analysis_no_pattern():
+    from harness.feedback import _analyze_patterns
+    history = []
+    suggestion = _analyze_patterns(history)
+    assert suggestion == ""
+
+
+def test_pattern_analysis_mixed_no_suggestion():
+    from harness.feedback import _analyze_patterns
+    from harness.models import Action, ActionResult
+    history = []
+    tools = ["write_file", "run_shell", "read_file"]
+    for t in tools:
+        action = Action(tool=t, args={}, raw="")
+        result = ActionResult(success=False, output="", error="e", exit_code=1)
+        fb = Feedback(passed=False, summary="[FAIL]", raw_result=result)
+        history.append((action, fb))
+    suggestion = _analyze_patterns(history)
+    assert suggestion == ""
