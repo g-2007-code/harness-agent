@@ -2,11 +2,11 @@
 
 ## Overview
 
-Deepen the feedback loop from a single reactive PASS/FAIL check to a multi-stage pipeline with structured feedback, post-action hooks, pattern analysis, and self-correction.
+Deepen the feedback loop from a single reactive PASS/FAIL check to a multi-stage pipeline with structured feedback, post-action checks, pattern analysis, and enhanced feedback injection that drives LLM self-correction.
 
 ## Motivation
 
-Current feedback (`harness/feedback.py`) is 10 lines — just `result.success → PASS/FAIL`. The LLM sees only a flat summary string. No auto-lint, no auto-test, no pattern detection, no self-correction.
+Current feedback (`harness/feedback.py`) is 10 lines — just `result.success → PASS/FAIL`. The LLM sees only a flat summary string. No auto-lint, no auto-test, no pattern detection, no structured feedback.
 
 ## Architecture
 
@@ -16,14 +16,22 @@ Action → dispatch → ActionResult
               Feedback Pipeline:
                 Stage 1: Basic check (success/exit_code → PASS/FAIL)
                 Stage 2: Syntax check (if write_file .py, run py_compile)
-                Stage 3: Pattern analysis (compare with last N feedbacks)
+                Stage 3: Test check (if write_file test_*.py, run pytest)
+                Stage 4: Pattern analysis (compare with last N feedbacks)
                         ↓
               Enriched Feedback (with checks[], suggested_next_action)
                         ↓
               Memory: stores structured feedback, LLM sees enriched summary
                         ↓
-              Loop: auto-retry on syntax errors, inject hints for patterns
+              Loop: injects hint to LLM → LLM self-corrects in next turn
 ```
+
+**Key clarification on "self-correction":** The harness CANNOT fix syntax errors itself — that requires LLM intelligence. What the harness does is:
+1. Detect the failure (via py_compile / pytest)
+2. Inject a detailed, structured hint to the LLM context
+3. The LLM sees the hint in the next turn and rewrites the file
+
+This is "enhanced feedback that drives LLM self-correction", not "harness auto-fixes". The `_try_auto_fix` concept from the previous draft was wrong and has been removed.
 
 ## Data Model Changes
 
@@ -33,7 +41,7 @@ Action → dispatch → ActionResult
 @dataclass
 class CheckResult:
     """Result of a single feedback pipeline check."""
-    name: str       # "syntax", "test", "blacklist"
+    name: str       # "syntax", "test", "pattern"
     passed: bool
     detail: str
 
@@ -56,7 +64,7 @@ class ActionResult:
     output: str
     error: str
     exit_code: int
-    metadata: dict = field(default_factory=dict)  # NEW
+    metadata: dict = field(default_factory=dict)  # NEW: stores path, tool name, etc.
 ```
 
 ## Feedback Pipeline (`harness/feedback.py`)
@@ -68,7 +76,7 @@ def collect(result: ActionResult, tool: str = "", turn_number: int = 0,
     passed = result.success
     summary = _build_summary(passed, tool, result)
 
-    # Stage 2: Syntax check
+    # Stage 2: Syntax check (only for write_file on .py files)
     checks = []
     if tool == "write_file" and result.success:
         path = result.metadata.get("path", "")
@@ -77,8 +85,17 @@ def collect(result: ActionResult, tool: str = "", turn_number: int = 0,
             checks.append(check)
             if not check.passed:
                 passed = False
+                summary += f" | Syntax check FAILED: {check.detail}"
 
-    # Stage 3: Pattern analysis
+    # Stage 3: Test check (only for write_file on test_*.py files)
+    if tool == "write_file" and result.success and path.endswith("test_*.py"):
+        check = _check_tests(path)
+        checks.append(check)
+        if not check.passed:
+            passed = False
+            summary += f" | Test check FAILED: {check.detail}"
+
+    # Stage 4: Pattern analysis
     suggestion = ""
     if history:
         suggestion = _analyze_patterns(history)
@@ -93,7 +110,7 @@ def collect(result: ActionResult, tool: str = "", turn_number: int = 0,
 ```python
 def _check_syntax(path: str) -> CheckResult:
     """Run py_compile on a .py file to check syntax."""
-    import py_compile, sys
+    import py_compile
     try:
         py_compile.compile(path, doraise=True)
         return CheckResult(name="syntax", passed=True, detail="Syntax OK")
@@ -101,45 +118,71 @@ def _check_syntax(path: str) -> CheckResult:
         return CheckResult(name="syntax", passed=False, detail=str(e))
 ```
 
-### Stage 3: Pattern Analysis
+### Stage 3: Test Check
+
+```python
+def _check_tests(path: str) -> CheckResult:
+    """Run pytest on the test file to check if tests pass."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["python", "-m", "pytest", path, "--tb=short", "-q"],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            return CheckResult(name="test", passed=True, detail="All tests passed")
+        else:
+            return CheckResult(name="test", passed=False,
+                             detail=result.stdout[-500:] + result.stderr[-500:])
+    except subprocess.TimeoutExpired:
+        return CheckResult(name="test", passed=False, detail="Test timed out after 30s")
+    except Exception as e:
+        return CheckResult(name="test", passed=False, detail=str(e))
+```
+
+### Stage 4: Pattern Analysis
 
 ```python
 def _analyze_patterns(history: list) -> str:
-    """Detect recurring failure patterns in recent history."""
-    recent = [fb for _, fb in history[-5:]]
-    failures = [fb for fb in recent if not fb.passed]
+    """Detect recurring failure patterns in recent history.
+    
+    history is a list of (Action, Feedback) tuples.
+    Uses action.tool (not feedback metadata) to identify the tool.
+    """
+    recent = history[-5:]  # last 5 (Action, Feedback) pairs
+    failures = [(action, fb) for action, fb in recent if not fb.passed]
     if len(failures) >= 3:
-        tools = [fb.raw_result.metadata.get("tool", "") for fb in failures]
+        tools = [action.tool for action, _ in failures]  # FIXED: use action.tool
         if all(t == "write_file" for t in tools):
-            return "Suggestion: 3 consecutive write failures. Check file permissions and syntax."
+            return "Hint: 3 consecutive write failures. Check syntax and file permissions before retrying."
         if all(t == "run_shell" for t in tools):
-            return "Suggestion: 3 consecutive shell failures. Try a different approach."
+            return "Hint: 3 consecutive shell failures. Try a different command or approach."
     return ""
 ```
 
-## Loop Self-Correction (`harness/loop.py`)
+## Loop Enhanced Feedback Injection (`harness/loop.py`)
 
 ```python
 # After feedback collection
 feedback = collect(result, action.tool, turn, self._memory.get_history())
 
-# Inject suggestion into context
+# Inject structured hint to LLM context (drives LLM self-correction)
 if feedback.suggested_next_action:
     self._memory.append_hint(feedback.suggested_next_action)
 
-# Auto-retry: syntax error → auto-fix and re-run
+# If syntax/test check failed, inject detailed error to help LLM fix it
 if not feedback.passed and feedback.checks:
-    auto_fix = self._try_auto_fix(action, feedback)
-    if auto_fix:
-        result = auto_fix
-        feedback = collect(result, action.tool, turn, ...)
+    failed_checks = [c for c in feedback.checks if not c.passed]
+    if failed_checks:
+        hint = f"Your last action failed checks: {failed_checks[0].detail}. Please fix and retry."
+        self._memory.append_hint(hint)
 ```
 
-### Auto-fix Strategies
+**What this does:** When the LLM writes a file with syntax errors, the next turn's context includes:
+1. `[Tool Result] [FAIL] write_file | Syntax check FAILED: SyntaxError: invalid syntax...`
+2. `[Hint] Your last action failed checks: SyntaxError: invalid syntax... Please fix and retry.`
 
-- **Syntax error in write_file**: Re-run `py_compile` after the fix, or suggest the LLM re-attempt
-- **Governance blocked**: Generate safe alternative command
-- **Parse error**: Re-prompt with simpler format requirement
+The LLM sees both the failure and the specific error, enabling it to self-correct.
 
 ## Memory Changes (`harness/memory.py`)
 
@@ -163,11 +206,26 @@ def get_history(self) -> list:
 | File | Change |
 |------|--------|
 | `harness/models.py` | Add `CheckResult`, extend `Feedback` with `checks`/`suggested_next_action`/`turn_number`, add `metadata` to `ActionResult` |
-| `harness/feedback.py` | Multi-stage pipeline: basic → syntax check → pattern analysis |
-| `harness/loop.py` | Self-correction: auto-retry, hint injection, suggestion handling |
+| `harness/feedback.py` | Multi-stage pipeline: basic → syntax check → test check → pattern analysis |
+| `harness/loop.py` | Enhanced feedback injection: hint injection for failed checks, pattern suggestions |
 | `harness/memory.py` | `append_hint()`, `get_history()` |
 | `harness/tools/file_tools.py` | Add `metadata` to `ActionResult` return |
 | `harness/tools/shell.py` | Add `metadata` to `ActionResult` return |
+| `SPEC.md` | Update §3.6 (反馈模块) and §11.6 (重点维度) to reflect Phase 2 implementation |
+
+## Scope vs SPEC.md §11.6
+
+SPEC.md §11.6 promised these for Phase 2:
+
+| SPEC promise | This design | Status |
+|--------------|------------|--------|
+| 多阶段校验管道 | syntax + test checks | ✅ Partial (no typecheck/coverage) |
+| 失败分类（语法/类型/逻辑/风格） | syntax check classifies syntax errors | ✅ Partial |
+| 多轮自我修正循环 | hint injection drives LLM self-correction | ✅ Aligned |
+| 治理深化（HITL 状态机） | — | ❌ Out of scope (YAGNI) |
+| 记忆深化（项目约定学习） | — | ❌ Out of scope (YAGNI) |
+
+**Rationale for scope cuts:** HITL state machine and project convention learning add complexity without proportional value for a course project. The core contribution — multi-stage feedback pipeline + self-correction via hint injection — is where the depth lies. SPEC.md will be updated to reflect this scope.
 
 ## Test Strategy
 
@@ -178,11 +236,18 @@ def get_history(self) -> list:
 | `test_check_syntax_pass` | `test_feedback.py` | Unit | Valid .py file passes syntax check |
 | `test_check_syntax_fail` | `test_feedback.py` | Unit | Invalid .py file fails syntax check |
 | `test_pipeline_with_syntax_check` | `test_feedback.py` | Unit | write_file .py triggers syntax check |
+| `test_pipeline_skips_non_py` | `test_feedback.py` | Unit | write_file .txt skips syntax check |
 | `test_pattern_analysis_3_failures` | `test_feedback.py` | Unit | 3 consecutive failures → suggestion |
 | `test_pattern_analysis_no_pattern` | `test_feedback.py` | Unit | No pattern → empty suggestion |
-| `test_loop_auto_retry_syntax_error` | `test_loop.py` | Integration | Mock LLM writes bad syntax → auto-retry |
-| `test_loop_injects_suggestion` | `test_loop.py` | Integration | Suggestion appears in context |
+| `test_loop_injects_hint_on_fail` | `test_loop.py` | Integration | Syntax fail → hint appears in context |
+| `test_loop_injects_suggestion` | `test_loop.py` | Integration | Pattern suggestion appears in context |
 | `test_demo_updated` | `test_demo.py` | Demo | Updated A.6 demo with pipeline |
+
+### Backward Compatibility
+
+- `ActionResult.metadata` defaults to `field(default_factory=dict)` — existing code creating `ActionResult` without metadata still works
+- `Feedback.checks` defaults to `field(default_factory=list)` — existing code creating `Feedback` without checks still works
+- `collect()` signature: new params `turn_number` and `history` have defaults — existing calls still work
 
 ### 61 existing tests must still pass (no regressions)
 
@@ -192,11 +257,12 @@ def get_history(self) -> list:
 pytest tests/ -v
 ```
 
-Expected: 61 existing + 8 new = 69 tests pass.
+Expected: 61 existing + 9 new = 70 tests pass.
 
 ## Edge Cases
 
 - Syntax check on non-.py write_file: skipped (no false positive)
+- Test check on non-test .py file: skipped (only runs on test_*.py)
 - Pattern analysis with < 3 turns: returns empty (no false suggestion)
-- Auto-retry on governance block: not attempted (governance is final)
 - metadata backward compatibility: existing tool calls without metadata get empty dict
+- py_compile creates __pycache__ — tests use tmp_path so no pollution
