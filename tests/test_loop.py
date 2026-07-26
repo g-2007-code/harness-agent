@@ -1,4 +1,5 @@
 # tests/test_loop.py
+import json
 import pytest
 from harness.loop import AgentLoop
 from harness.llm.base import LLMProvider, LLMError
@@ -155,3 +156,60 @@ def test_loop_stops_after_max_llm_retries(monkeypatch):
     assert "stopped" in result.lower()
     assert "3" in result
     assert llm.calls == 4
+
+
+def test_loop_injects_hint_on_syntax_fail(tmp_path):
+    """When write_file produces a syntax error, a hint should appear in context."""
+    bad_file = tmp_path / "bad.py"
+    responses = [
+        f'{{"tool": "write_file", "args": {{"path": {json.dumps(str(bad_file))}, "content": "def broken(\\n"}}}}',
+        '{"tool": "task_complete", "args": {"summary": "done"}}',
+    ]
+    llm = MockLLM(responses)
+    registry = ToolRegistry()
+    registry.register("write_file", write_file)
+    registry.register("read_file", read_file)
+    registry.register("run_shell", run_shell)
+
+    loop = AgentLoop(
+        llm=llm,
+        registry=registry,
+        governance=Governance(blocked_commands=[], auto_deny=True, project_dir=str(tmp_path)),
+        memory=Memory(task="write bad file", session_dir=str(tmp_path / "sessions")),
+        max_turns=10,
+    )
+    result = loop.run("write bad file")
+    assert "done" in result.lower()
+    # Verify hint was injected into context
+    ctx = loop._memory.build_context()
+    assert any("[Hint]" in m.content for m in ctx)
+
+
+def test_loop_injects_suggestion_on_pattern(tmp_path):
+    """When 3 consecutive write_file failures occur, a pattern suggestion should appear."""
+    bad_path = str(tmp_path / "blocked.py")
+    responses = [
+        f'{{"tool": "write_file", "args": {{"path": {json.dumps(bad_path)}, "content": "x"}}}}',
+        f'{{"tool": "write_file", "args": {{"path": {json.dumps(bad_path)}, "content": "y"}}}}',
+        f'{{"tool": "write_file", "args": {{"path": {json.dumps(bad_path)}, "content": "z"}}}}',
+        f'{{"tool": "write_file", "args": {{"path": {json.dumps(bad_path)}, "content": "w"}}}}',
+        '{"tool": "task_complete", "args": {"summary": "done"}}',
+    ]
+    llm = MockLLM(responses)
+    registry = ToolRegistry()
+    registry.register("write_file", write_file)
+    registry.register("read_file", read_file)
+    registry.register("run_shell", run_shell)
+
+    loop = AgentLoop(
+        llm=llm,
+        registry=registry,
+        governance=Governance(blocked_commands=[], auto_deny=True, project_dir=str(tmp_path / "project")),
+        memory=Memory(task="write files", session_dir=str(tmp_path / "sessions")),
+        max_turns=10,
+    )
+    result = loop.run("write files")
+    assert "done" in result.lower()
+    # After 3 write_file failures, pattern analysis should trigger and inject a hint
+    ctx = loop._memory.build_context()
+    assert any("[Hint]" in m.content for m in ctx), "Pattern suggestion hint should be in context"
