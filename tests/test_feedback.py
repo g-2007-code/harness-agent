@@ -105,6 +105,26 @@ def test_pattern_analysis_mixed_no_suggestion():
     assert suggestion == ""
 
 
+def test_pattern_analysis_non_consecutive_no_suggestion():
+    """Non-consecutive failures should NOT trigger a suggestion."""
+    from harness.feedback import _analyze_patterns
+    from harness.models import Action, ActionResult
+    history = []
+    # fail, pass, fail, pass, fail — 3 failures but not consecutive
+    for i in range(3):
+        action = Action(tool="write_file", args={}, raw="")
+        fail_result = ActionResult(success=False, output="", error="e", exit_code=1)
+        fail_fb = Feedback(passed=False, summary="[FAIL]", raw_result=fail_result)
+        history.append((action, fail_fb))
+        if i < 2:
+            pass_action = Action(tool="read_file", args={}, raw="")
+            pass_result = ActionResult(success=True, output="ok", error="", exit_code=0)
+            pass_fb = Feedback(passed=True, summary="[PASS]", raw_result=pass_result)
+            history.append((pass_action, pass_fb))
+    suggestion = _analyze_patterns(history)
+    assert suggestion == ""
+
+
 def test_pipeline_with_syntax_check_pass(tmp_path):
     from harness.feedback import collect
     file_path = tmp_path / "valid.py"

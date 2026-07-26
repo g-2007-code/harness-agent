@@ -112,20 +112,20 @@ class AgentLoop:
             if self._cb:
                 self._cb.on_result(feedback.passed, feedback.summary)
 
-            # Inject pattern suggestion if detected
+            self._memory.append(action, feedback)
+
+            # Inject pattern suggestion (after append so hint follows result)
             if feedback.suggested_next_action:
                 self._memory.append_hint(feedback.suggested_next_action)
                 logger.info(f"[turn {turn}] Injected hint: {feedback.suggested_next_action}")
 
-            # Inject detailed hint for failed checks (syntax errors, etc.)
+            # Inject detailed hint for failed checks (after append so hint follows result)
             if not feedback.passed and feedback.checks:
                 failed_checks = [c for c in feedback.checks if not c.passed]
                 if failed_checks:
                     hint = f"Your last action failed checks: {failed_checks[0].detail[:300]}. Please fix and retry."
                     self._memory.append_hint(hint)
                     logger.info(f"[turn {turn}] Injected check hint: {hint[:100]}")
-
-            self._memory.append(action, feedback)
 
         if self._cb:
             self._cb.on_stop(f"Reached max turns ({self._max_turns})")

@@ -18,13 +18,14 @@ def _analyze_patterns(history: list) -> str:
     Returns a suggestion string, or empty string if no pattern detected.
     """
     recent = history[-5:]
-    failures = [(action, fb) for action, fb in recent if not fb.passed]
-    if len(failures) >= 3:
-        tools = [action.tool for action, _ in failures]
-        if all(t == "write_file" for t in tools):
-            return "Hint: 3 consecutive write failures. Check syntax and file permissions before retrying."
-        if all(t == "run_shell" for t in tools):
-            return "Hint: 3 consecutive shell failures. Try a different command or approach."
+    if len(recent) >= 3:
+        last_3 = recent[-3:]
+        if all(not fb.passed for _, fb in last_3):
+            tools = [action.tool for action, _ in last_3]
+            if all(t == "write_file" for t in tools):
+                return "Hint: 3 consecutive write failures. Check syntax and file permissions before retrying."
+            if all(t == "run_shell" for t in tools):
+                return "Hint: 3 consecutive shell failures. Try a different command or approach."
     return ""
 
 
