@@ -1,7 +1,14 @@
-# harness/feedback.py
-# This file contains the self-implemented feedback collection mechanism (harness kernel).
-# Written by the student, with AI assistance for boilerplate. Core logic is hand-designed.
-from harness.models import ActionResult, Feedback
+from harness.models import ActionResult, Feedback, CheckResult
+
+
+def _check_syntax(path: str) -> CheckResult:
+    """Run py_compile on a .py file to check syntax."""
+    import py_compile
+    try:
+        py_compile.compile(path, doraise=True)
+        return CheckResult(name="syntax", passed=True, detail="Syntax OK")
+    except py_compile.PyCompileError as e:
+        return CheckResult(name="syntax", passed=False, detail=str(e))
 
 
 def collect(result: ActionResult, tool: str = "") -> Feedback:

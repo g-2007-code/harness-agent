@@ -35,3 +35,23 @@ def test_collect_summary_includes_exit_code():
     result = ActionResult(success=False, output="", error="error", exit_code=42)
     fb = collect(result, tool="run_shell")
     assert "42" in fb.summary
+
+
+def test_check_syntax_pass(tmp_path):
+    from harness.feedback import _check_syntax
+    file_path = tmp_path / "valid.py"
+    file_path.write_text("x = 1\n")
+    check = _check_syntax(str(file_path))
+    assert check.name == "syntax"
+    assert check.passed is True
+    assert "OK" in check.detail
+
+
+def test_check_syntax_fail(tmp_path):
+    from harness.feedback import _check_syntax
+    file_path = tmp_path / "invalid.py"
+    file_path.write_text("def broken(\n")
+    check = _check_syntax(str(file_path))
+    assert check.name == "syntax"
+    assert check.passed is False
+    assert "SyntaxError" in check.detail or "syntax" in check.detail.lower()
