@@ -28,9 +28,36 @@ def _analyze_patterns(history: list) -> str:
     return ""
 
 
-def collect(result: ActionResult, tool: str = "") -> Feedback:
-    if result.success:
+def collect(result: ActionResult, tool: str = "",
+            turn_number: int = 0, history: list = None) -> Feedback:
+    # Stage 1: Basic check
+    passed = result.success
+    if passed:
         summary = f"[PASS] {tool}: {result.output[:200]}"
     else:
         summary = f"[FAIL] {tool} (exit_code={result.exit_code}): {result.error[:200]}"
-    return Feedback(passed=result.success, summary=summary, raw_result=result)
+
+    # Stage 2: Syntax check (only for write_file on .py files)
+    checks = []
+    if tool == "write_file" and result.success:
+        path = result.metadata.get("path", "")
+        if path.endswith(".py"):
+            check = _check_syntax(path)
+            checks.append(check)
+            if not check.passed:
+                passed = False
+                summary += f" | Syntax check FAILED: {check.detail[:200]}"
+
+    # Stage 3: Pattern analysis
+    suggestion = ""
+    if history:
+        suggestion = _analyze_patterns(history)
+
+    return Feedback(
+        passed=passed,
+        summary=summary,
+        raw_result=result,
+        checks=checks,
+        suggested_next_action=suggestion,
+        turn_number=turn_number,
+    )
