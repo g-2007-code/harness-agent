@@ -218,7 +218,6 @@ harness-agent/
 ├── SPEC_PROCESS.md        # Brainstorming + cold-start verification
 ├── AGENT_LOG.md           # Implementation process log
 ├── REFLECTION.md          # Reflection report
-└── FOR_FRESHMEN.md        # Project explanation for beginners
 ```
 
 ## Security
