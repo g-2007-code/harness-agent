@@ -1,4 +1,3 @@
-# harness/tools/file_tools.py
 import os
 from harness.models import ActionResult
 
@@ -19,6 +18,12 @@ def write_file(path: str, content: str) -> ActionResult:
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
-        return ActionResult(success=True, output=f"Wrote {len(content)} chars to {path}", error="", exit_code=0)
+        return ActionResult(
+            success=True,
+            output=f"Wrote {len(content)} chars to {path}",
+            error="",
+            exit_code=0,
+            metadata={"path": path, "tool": "write_file"},
+        )
     except Exception as e:
         return ActionResult(success=False, output="", error=str(e), exit_code=-1)
