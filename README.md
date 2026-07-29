@@ -162,6 +162,14 @@ pytest tests/test_demo.py -v
 pytest tests/ --cov=harness
 ```
 
+## CI Status
+
+GitHub Actions runs on every push. Latest status:
+- **unit-test**: 88 tests, all pass
+- **docker-build**: Docker image builds successfully
+
+Two historical PRs: [#1 Phase 2: Feedback Loop Deepening](https://github.com/g-2007-code/harness-agent/pull/1) → [#2 Docs sync](https://github.com/g-2007-code/harness-agent/pull/2)
+
 ## Directory Structure
 
 ```
@@ -203,12 +211,14 @@ harness-agent/
 ├── config.yaml            # Default config (DeepSeek)
 ├── Dockerfile             # Docker image
 ├── pyproject.toml         # Package config
+├── .github/workflows/test.yml  # GitHub Actions CI
 ├── .gitlab-ci.yml         # CI (unit-test + docker-build)
 ├── SPEC.md                # Design specification
 ├── PLAN.md                # Implementation plan (16 TDD tasks)
 ├── SPEC_PROCESS.md        # Brainstorming + cold-start verification
 ├── AGENT_LOG.md           # Implementation process log
-└── REFLECTION.md          # Reflection report
+├── REFLECTION.md          # Reflection report
+└── FOR_FRESHMEN.md        # Project explanation for beginners
 ```
 
 ## Security

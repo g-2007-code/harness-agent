@@ -298,7 +298,19 @@
 
 ---
 
-## 教训总结
+## 阶段八：PR 创建与最终提交核查
+
+### 2026-07-26 — PR 创建与文档完善
+
+- **任务**：补充 PR 记录，完善 FOR_FRESHMEN.md，最终核查
+- **技能**：`finishing-a-development-branch`、`humanizer`
+- **操作**：
+  - 创建 2 个 PR：PR #1 `phase2-feedback-loop`（9 个 commit，Phase 2 功能开发）→ 合并到 master
+  - PR #2 `docs-sync`（6 个 commit，文档同步与清理）→ 合并到 master
+  - 核对交付清单 9 项，8 项通过，1 项豁免（WebUI，CLI 项目可豁免）
+  - 新增 `FOR_FRESHMEN.md`：面向大一学生的项目解读 + 底层代码结构逐文件讲解
+  - 使用 `humanizer` 技能润色 REFLECTION.md，移除 AI 痕迹（em dash、粗体滥用、编号提纲、"本质上"等措辞）
+- **教训**：PR 记录可以 retroactively 补，但 worktree 无法回溯——单人项目串行开发时 worktree 形式大于实质
 
 1. **PLAN 中的代码在 Windows 上可能需要调整**：引号语法、命令兼容性、断言文本匹配
 2. **系统提示词必须包含运行环境信息**：否则 LLM 默认用 Linux 命令

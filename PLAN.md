@@ -2260,3 +2260,5 @@ Phase 2 的实现计划见 `docs/superpowers/plans/2026-07-26-phase2-feedback-lo
 | fix | hint 顺序修正 + 连续失败检查 | `ef64d7f` | ✅ |
 
 测试：88/88 通过（61 Phase 1 + 27 Phase 2）
+
+PR 记录：PR [#1](https://github.com/g-2007-code/harness-agent/pull/1)（Phase 2 功能，9 commit）→ PR [#2](https://github.com/g-2007-code/harness-agent/pull/2)（文档同步，6 commit）
