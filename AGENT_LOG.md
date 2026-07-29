@@ -12,7 +12,7 @@
 - **操作**：读取三个作业文档，分析 A/B 两个方向，推荐 A（Coding Agent Harness）
 - **关键决策**：
   - 语言：Python
-  - LLM：可插拔（OpenAI/Anthropic/Google/Mock）
+  - LLM：可插拔（OpenAI + DeepSeek via base_url + Mock）
   - 重点维度：反馈闭环
   - 目标场景：Python 项目专用 coding agent
   - 交互方式：CLI
@@ -234,6 +234,70 @@
 
 ---
 
+## 阶段六：TUI 终端界面
+
+### 2026-07-26 — TUI 开发
+
+- **操作**：新增 `harness/tui.py`（rich 库回调渲染器），修改 `harness/loop.py` 加 callback 参数，修改 `harness/cli.py` 接入 TUI
+- **commit**：`20cf984`
+- **测试**：用真实 DeepSeek LLM 验证，5 轮完成 bug 修复，TUI 实时显示 Task/Turn/Action/Result/Complete 面板
+- **人工干预**：无
+
+---
+
+## 阶段七：Phase 2 反馈闭环深化
+
+### 2026-07-26 — Phase 2 brainstorming
+
+- **技能**：`brainstorming`
+- **操作**：审阅 Phase 1 完成情况，确定 Phase 2 方向为反馈闭环深化
+- **方案选择**：用户选方案 C（完整闭环：流水线 + 自修正 + 模式检测）
+- **设计文档**：`docs/superpowers/specs/2026-07-26-phase2-feedback-loop-design.md`（commit `957b5c3`）
+- **设计修复**：发现 4 个问题（自修正概念混淆、模式分析读错字段、与 SPEC 不对齐、未提及更新 SPEC），全部修复（commit `270ed9d`）
+
+### 2026-07-26 — Phase 2 writing-plans
+
+- **技能**：`writing-plans`
+- **操作**：将设计分解为 8 个 TDD task
+- **计划文档**：`docs/superpowers/plans/2026-07-26-phase2-feedback-loop.md`（commit `0014dba`）
+
+### 2026-07-26 — Phase 2 subagent-driven-development
+
+- **技能**：`subagent-driven-development`
+- **8 个 Task 全部完成**：
+
+| Task | 内容 | Commit | 评审 |
+|------|------|--------|------|
+| 1 | 数据模型扩展（CheckResult, Feedback.checks, ActionResult.metadata） | `365ab55` | clean |
+| 2 | 工具返回 metadata（path, tool name） | `54dbfe1` | clean |
+| 3 | 语法检查阶段（py_compile） | `645db28` | clean |
+| 4 | 模式分析阶段（3 次连续失败检测） | `addc632` | clean |
+| 5 | 流水线集成（basic → syntax → pattern） | `7cbb8be` | clean |
+| 6 | Memory 新增 append_hint() / get_history() | `43d4e62` | clean |
+| 7 | Loop 注入 hint 驱动 LLM 自修正 | `5525067` | fix 后 clean |
+| 8 | A.6 demo 第 4 项 + SPEC §3.6/§11.6 更新 | `8e94061` | clean |
+
+- **Task 7 修复**：Windows 路径 JSON 转义 bug + 模式建议测试覆盖不足，fix subagent 修复
+- **人工干预**：Task 7 中断后重新派发，发现 Windows 路径在 JSON 中需用 `json.dumps()` 转义
+
+### 2026-07-26 — Phase 2 最终评审
+
+- **技能**：`requesting-code-review`
+- **评审结果**：Approved for merge
+- **发现 2 个 Important**：
+  1. hint 顺序在 LLM 上下文中颠倒（hint 在 action/result 之前）
+  2. 模式分析未检查连续性（SPEC 说"连续失败"但代码只计数总数）
+- **修复**：reorder hint injection + enforce consecutive check（commit `ef64d7f`）
+- **新增 1 个测试**：`test_pattern_analysis_non_consecutive_no_suggestion`
+- **测试**：88 全量通过
+
+### 2026-07-26 — Phase 2 推送
+
+- **技能**：`finishing-a-development-branch`
+- **操作**：`git push origin master`（`20cf984`..`ef64d7f`）
+
+---
+
 ## 教训总结
 
 1. **PLAN 中的代码在 Windows 上可能需要调整**：引号语法、命令兼容性、断言文本匹配
@@ -242,3 +306,7 @@
 4. **logging 初始化顺序**：FileHandler 需要目录先存在
 5. **pyproject.toml build-backend**：必须用有效的 `setuptools.build_meta`
 6. **冷启动验证价值巨大**：证明了 SPEC/PLAN 质量足够高，但也暴露了"只选 2 个 task 不含依赖"的操作问题
+7. **Windows 路径在 JSON 中需转义**：`json.dumps(str(path))` 而非直接插值，否则 `\U`、`\b` 等导致 JSON 解析失败
+8. **设计文档中的"自修正"概念需澄清**：harness 不能自己修复文件，只能注入 hint 让 LLM 下轮自修正——这是"增强反馈"而非"自动修复"
+9. **模式分析需检查连续性**：只计数总数会产生误报，必须检查最近 N 条是否全部失败
+10. **hint 顺序影响 LLM 理解**：hint 应在 action/result 之后注入，LLM 才能理解 hint 指的是什么

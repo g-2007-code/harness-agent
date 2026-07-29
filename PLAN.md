@@ -24,20 +24,24 @@
 
 ```
 harness-agent/
+├── .github/workflows/
+│   └── test.yml           # GitHub Actions (unit-test + docker-build)
 ├── harness/
 │   ├── __init__.py
-│   ├── models.py          # Data models (Message, Action, ActionResult, Feedback, etc.)
+│   ├── models.py          # Data models (Message, Action, ActionResult, Feedback, CheckResult, etc.)
 │   ├── config.py          # YAML config loading with defaults
 │   ├── parser.py          # Parse LLM JSON response → Action
 │   ├── governance.py      # Guardrail: check(action) → GovernanceDecision
-│   ├── feedback.py        # Collect ActionResult → Feedback (pass/fail judgment)
-│   ├── memory.py          # Session context + cross-session persistence
-│   ├── loop.py            # Agent main loop
-│   ├── cli.py             # CLI entry + keyring subcommands
+│   ├── feedback.py        # Multi-stage pipeline: basic → syntax check → pattern analysis
+│   ├── memory.py          # Session context + cross-session persistence + hint injection
+│   ├── loop.py            # Agent main loop (6-step cycle + hint injection)
+│   ├── cli.py             # CLI entry + keyring subcommands + TUI integration
+│   ├── tui.py             # Terminal UI renderer (rich-based callback)
 │   ├── llm/
 │   │   ├── __init__.py    # LLMProvider ABC + factory
+│   │   ├── base.py        # LLMProvider ABC + LLMError
 │   │   ├── mock.py        # Mock LLM (deterministic, script-based)
-│   │   └── openai.py      # OpenAI Chat Completions provider
+│   │   └── openai.py      # OpenAI Chat Completions provider (OpenAI + DeepSeek via base_url)
 │   └── tools/
 │       ├── __init__.py    # ToolRegistry
 │       ├── file_tools.py  # read_file, write_file
@@ -53,6 +57,7 @@ harness-agent/
 │   ├── test_memory.py
 │   ├── test_tools.py
 │   ├── test_llm_mock.py
+│   ├── test_llm_openai.py
 │   ├── test_loop.py
 │   ├── test_cli.py
 │   └── test_demo.py       # Mechanism demonstration (A.6)
@@ -64,7 +69,10 @@ harness-agent/
 ├── SPEC.md
 ├── PLAN.md
 ├── AGENT_LOG.md
-└── .gitlab-ci.yml
+├── .gitlab-ci.yml
+└── docs/superpowers/
+    ├── specs/             # Phase 2 design spec
+    └── plans/             # Phase 2 implementation plan
 ```
 
 ## Task Dependency Graph
@@ -2228,3 +2236,27 @@ No TBD, TODO, or placeholder patterns found. All steps contain complete code.
 - `Governance.check(action) -> GovernanceDecision` — consistent across Tasks 8, 11, 14 ✅
 - `collect(result, tool) -> Feedback` — consistent across Tasks 9, 11, 14 ✅
 - `Memory.build_context/append/save_session/load_session` — consistent across Tasks 10, 11, 12 ✅
+
+---
+
+## Phase 2: Feedback Loop Deepening
+
+Phase 2 的实现计划见 `docs/superpowers/plans/2026-07-26-phase2-feedback-loop.md`（8 个 TDD task，全部完成）。
+
+设计文档见 `docs/superpowers/specs/2026-07-26-phase2-feedback-loop-design.md`。
+
+### Phase 2 Task 完成状态
+
+| Task | 内容 | Commit | 状态 |
+|------|------|--------|------|
+| 1 | 数据模型扩展（CheckResult, Feedback.checks, ActionResult.metadata） | `365ab55` | ✅ |
+| 2 | 工具返回 metadata（path, tool name） | `54dbfe1` | ✅ |
+| 3 | 语法检查阶段（py_compile） | `645db28` | ✅ |
+| 4 | 模式分析阶段（3 次连续失败检测） | `addc632` | ✅ |
+| 5 | 流水线集成（basic → syntax → pattern） | `7cbb8be` | ✅ |
+| 6 | Memory 新增 append_hint() / get_history() | `43d4e62` | ✅ |
+| 7 | Loop 注入 hint 驱动 LLM 自修正 | `5525067` | ✅ |
+| 8 | A.6 demo 第 4 项 + SPEC §3.6/§11.6 更新 | `8e94061` | ✅ |
+| fix | hint 顺序修正 + 连续失败检查 | `ef64d7f` | ✅ |
+
+测试：88/88 通过（61 Phase 1 + 27 Phase 2）
