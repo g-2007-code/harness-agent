@@ -1,0 +1,18 @@
+llm:
+  provider: mock
+  model: gpt-4o
+max_turns: 20
+governance:
+  blocked_commands:
+    - "rm -rf"
+    - "git push --force"
+    - "curl"
+    - "wget"
+    - "chmod 777"
+    - "sudo"
+  auto_deny: false
+session:
+  dir: ".harness/sessions"
+logging:
+  level: info
+  dir: ".harness/logs"

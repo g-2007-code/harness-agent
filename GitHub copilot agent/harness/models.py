@@ -1,0 +1,62 @@
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
+
+
+@dataclass
+class Message:
+    role: str
+    content: str
+
+
+@dataclass
+class Conversation:
+    messages: List[Message]
+
+
+@dataclass
+class Action:
+    tool: str
+    args: Dict[str, object]
+    raw: str
+
+
+@dataclass
+class ActionResult:
+    success: bool
+    output: str
+    error: str
+    exit_code: int
+
+
+@dataclass
+class Feedback:
+    passed: bool
+    summary: str
+    raw_result: ActionResult
+
+
+@dataclass
+class GovernanceDecision:
+    allow: bool
+    confirm: bool
+    reason: str
+
+
+@dataclass
+class Session:
+    id: str
+    task: str
+    history: List[Tuple[Action, Feedback]]
+    summary: str
+
+
+@dataclass
+class Config:
+    llm_provider: str
+    llm_model: str
+    max_turns: int
+    blocked_commands: List[str]
+    auto_deny: bool
+    session_dir: str
+    log_level: str
+    log_dir: str
