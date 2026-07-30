@@ -1,6 +1,8 @@
 # AGENT_LOG.md — 实现过程日志
 
 > 按时间顺序记录关键节点，每条包含时间戳、task 编号、触发的 Superpowers 技能、关键 prompt/context 配置、subagent 输出片段或 commit hash、人工干预、教训。
+>
+> **仓库**: [https://github.com/g-2007-code/harness-agent](https://github.com/g-2007-code/harness-agent)
 
 ---
 

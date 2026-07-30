@@ -1,6 +1,10 @@
 # harness-agent
 
+[![CI](https://github.com/g-2007-code/harness-agent/actions/workflows/test.yml/badge.svg)](https://github.com/g-2007-code/harness-agent/actions)
+
 A self-implemented coding agent harness for Python projects. Built from scratch (no LangChain/AutoGen) with 6 dimensions: decision loop, tools, governance, feedback, memory, and config.
+
+**GitHub**: [https://github.com/g-2007-code/harness-agent](https://github.com/g-2007-code/harness-agent)
 
 ## Features
 

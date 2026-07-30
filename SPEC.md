@@ -1,6 +1,8 @@
 # SPEC.md — harness-agent
 
 > *Spec-Driven, Subagent-Built, Human-Owned.*
+>
+> **仓库**: [https://github.com/g-2007-code/harness-agent](https://github.com/g-2007-code/harness-agent)
 
 ## 一、问题陈述
 
