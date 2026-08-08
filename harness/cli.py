@@ -31,7 +31,7 @@ def keyring_setup():
     except (ValueError, IndexError):
         print("Invalid choice")
         return
-    key = getpass.getpass(f"Enter API key for {provider}: ")
+    key = getpass.getpass(f"Enter API key for {provider} (input is hidden for security): ")
     keyring.set_password(KEYRING_SERVICE, provider, key)
     print(f"API key for {provider} stored.")
 
