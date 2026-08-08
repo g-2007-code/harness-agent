@@ -254,14 +254,14 @@
 - **技能**：`brainstorming`
 - **操作**：审阅 Phase 1 完成情况，确定 Phase 2 方向为反馈闭环深化
 - **方案选择**：用户选方案 C（完整闭环：流水线 + 自修正 + 模式检测）
-- **设计文档**：`docs/superpowers/specs/2026-07-26-phase2-feedback-loop-design.md`（commit `957b5c3`）
+- **设计文档**：Phase 2 设计（已整合进 SPEC.md §3.6/§11.6/§12.2 及本文件，原 `docs/superpowers/specs/` 已归档删除）
 - **设计修复**：发现 4 个问题（自修正概念混淆、模式分析读错字段、与 SPEC 不对齐、未提及更新 SPEC），全部修复（commit `270ed9d`）
 
 ### 2026-07-26 — Phase 2 writing-plans
 
 - **技能**：`writing-plans`
 - **操作**：将设计分解为 8 个 TDD task
-- **计划文档**：`docs/superpowers/plans/2026-07-26-phase2-feedback-loop.md`（commit `0014dba`）
+- **计划文档**：Phase 2 计划（已整合进 PLAN.md "Phase 2: Feedback Loop Deepening" 章节，8 个 TDD task 全部完成）
 
 ### 2026-07-26 — Phase 2 subagent-driven-development
 

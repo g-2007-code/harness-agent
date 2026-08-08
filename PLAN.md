@@ -69,10 +69,7 @@ harness-agent/
 ├── SPEC.md
 ├── PLAN.md
 ├── AGENT_LOG.md
-├── .gitlab-ci.yml
-└── docs/superpowers/
-    ├── specs/             # Phase 2 design spec
-    └── plans/             # Phase 2 implementation plan
+└── .gitlab-ci.yml
 ```
 
 ## Task Dependency Graph
@@ -2241,23 +2238,40 @@ No TBD, TODO, or placeholder patterns found. All steps contain complete code.
 
 ## Phase 2: Feedback Loop Deepening
 
-Phase 2 的实现计划见 `docs/superpowers/plans/2026-07-26-phase2-feedback-loop.md`（8 个 TDD task，全部完成）。
+Phase 2 将反馈从单一的 PASS/FAIL 判定深化为多阶段流水线（基础检查 → 语法检查 → 模式分析），注入结构化 hint 驱动 LLM 自修正。
 
-设计文档见 `docs/superpowers/specs/2026-07-26-phase2-feedback-loop-design.md`。
+**目标**：`feedback.py` 从简单的 `result.success → PASS/FAIL` 扩展为多阶段流水线 + 结构化反馈 + hint 注入。
+
+**架构**：扩展 `feedback.py` 为多阶段流水线（basic → syntax → pattern）。新增 `CheckResult` 模型和 `ActionResult.metadata`。失败时注入结构化 hint 到 LLM 上下文。所有改动向后兼容（新字段有默认值）。
+
+**约束**：TDD 强制；向后兼容（新字段必须有默认值）；mock LLM 可测试；每个 task 结束提交。
+
+### 依赖图
+
+```
+Task 1 (models) ──→ Task 2 (tool metadata)
+                ──→ Task 3 (syntax check)
+                ──→ Task 4 (pattern analysis)
+                ──→ Task 5 (pipeline) ──→ Task 6 (memory)
+                                       ──→ Task 7 (loop)
+                                            ──→ Task 8 (demo + spec)
+```
+
+**可并行**：Task 2、3、4、6 可在 Task 1 后并行。Task 5 依赖 3+4。Task 7 依赖 5+6。
 
 ### Phase 2 Task 完成状态
 
-| Task | 内容 | Commit | 状态 |
-|------|------|--------|------|
-| 1 | 数据模型扩展（CheckResult, Feedback.checks, ActionResult.metadata） | `365ab55` | ✅ |
-| 2 | 工具返回 metadata（path, tool name） | `54dbfe1` | ✅ |
-| 3 | 语法检查阶段（py_compile） | `645db28` | ✅ |
-| 4 | 模式分析阶段（3 次连续失败检测） | `addc632` | ✅ |
-| 5 | 流水线集成（basic → syntax → pattern） | `7cbb8be` | ✅ |
-| 6 | Memory 新增 append_hint() / get_history() | `43d4e62` | ✅ |
-| 7 | Loop 注入 hint 驱动 LLM 自修正 | `5525067` | ✅ |
-| 8 | A.6 demo 第 4 项 + SPEC §3.6/§11.6 更新 | `8e94061` | ✅ |
-| fix | hint 顺序修正 + 连续失败检查 | `ef64d7f` | ✅ |
+| Task | 内容 | 涉及文件 | 接口 | 验证 | Commit | 状态 |
+|------|------|---------|------|------|--------|------|
+| 1 | 数据模型扩展 | `harness/models.py`, `tests/test_models.py` | 新增 `CheckResult`；扩展 `Feedback` 含 `checks`/`suggested_next_action`/`turn_number`；`ActionResult` 加 `metadata` | pytest（5 个新测试 + 7 个旧测试，向后兼容） | `365ab55` | ✅ |
+| 2 | 工具返回 metadata | `harness/tools/file_tools.py`, `harness/tools/shell.py`, `tests/test_tools.py` | `write_file` 返回 `metadata={"path", "tool"}`；`run_shell` 返回 `metadata={"tool", "command"}` | pytest | `54dbfe1` | ✅ |
+| 3 | 语法检查阶段 | `harness/feedback.py`, `tests/test_feedback.py` | `_check_syntax(path) -> CheckResult`（py_compile） | pytest | `645db28` | ✅ |
+| 4 | 模式分析阶段 | `harness/feedback.py`, `tests/test_feedback.py` | `_analyze_patterns(history) -> str`（3 次连续失败检测） | pytest | `addc632` | ✅ |
+| 5 | 流水线集成 | `harness/feedback.py`, `tests/test_feedback.py` | `collect(result, tool, turn_number, history) -> Feedback`（basic → syntax → pattern） | pytest | `7cbb8be` | ✅ |
+| 6 | Memory 新增方法 | `harness/memory.py`, `tests/test_memory.py` | `Memory.append_hint(hint)`、`Memory.get_history() -> list` | pytest | `43d4e62` | ✅ |
+| 7 | Loop 注入 hint | `harness/loop.py`, `tests/test_loop.py` | `AgentLoop.run()` 在失败检查/模式建议时注入 `[Hint]` 消息 | pytest | `5525067` | ✅ |
+| 8 | A.6 demo + SPEC 更新 | `tests/test_demo.py`, `SPEC.md` | 第 4 项机制演示（流水线语法检查 → hint → 自修正）；更新 SPEC §3.6/§11.6 | pytest | `8e94061` | ✅ |
+| fix | hint 顺序修正 + 连续失败检查 | `harness/loop.py`, `harness/feedback.py`, 测试 | hint 在 action/result 之后注入；模式分析检查最近 N 条全部失败 | pytest | `ef64d7f` | ✅ |
 
 测试：88/88 通过（61 Phase 1 + 27 Phase 2）
 
