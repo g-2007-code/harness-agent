@@ -82,7 +82,16 @@ def cmd_run(args):
         if not api_key:
             api_key = os.environ.get(f"{config.llm_provider.upper()}_API_KEY")
         if not api_key:
-            print(f"No API key found for {config.llm_provider}. Run: harness keyring setup")
+            print(f"No API key found for {config.llm_provider}.")
+            print()
+            print("Options:")
+            print(f"  1. Run: harness keyring setup  (store API key securely)")
+            print(f"  2. Set env var: set {config.llm_provider.upper()}_API_KEY=sk-xxx")
+            print(f"  3. Use mock LLM: set llm.provider=mock in config.yaml")
+            print()
+            print("Quick test without API key:")
+            print("  > pip install -e .")
+            print("  > pytest tests/test_demo.py -v")
             sys.exit(1)
         llm = OpenAILLM(api_key=api_key, model=config.llm_model, base_url=config.llm_base_url)
 
